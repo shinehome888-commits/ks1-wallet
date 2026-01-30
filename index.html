@@ -250,7 +250,7 @@
   <script>
     // ===== AUTO-LOGOUT SYSTEM =====
     let inactivityTimer;
-    const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+    const INACTIVITY_TIMEOUT = 60 * 1000; // 1 minute ← UPDATED FROM 10 MINUTES
 
     function resetInactivityTimer() {
       clearTimeout(inactivityTimer);
@@ -272,7 +272,6 @@
     }
 
     function logout() {
-      // Clear in-memory wallet (do NOT delete from localStorage)
       state.wallet = null;
       state.address = '';
       state.balance = '...';
@@ -354,7 +353,6 @@
       app.innerHTML = '';
 
       if (state.view === 'landing') {
-        // Stop inactivity timer on landing
         stopInactivityListener();
 
         let unlockSection = '';
@@ -376,7 +374,7 @@
             Your keys, your crypto. We never access your funds.
           </p>
           <button class="btn btn-primary" onclick="handleCreate()">Create New Wallet</button>
-          <button class="btn btn-secondary" onclick="handleImport()">Import Wallet</button>
+          <button class="btn btn-primary" onclick="handleImport()">Import Wallet</button> <!-- ← NOW BLUE -->
           ${unlockSection}
           <div style="margin-top:24px; text-align:center; font-size:0.85rem; color:#64748b;">
             <span class="tooltip">?
@@ -388,7 +386,6 @@
         return;
       }
 
-      // Start inactivity timer when entering dashboard or other secure views
       if (['dashboard', 'send', 'receive', 'send-confirm'].includes(state.view)) {
         startInactivityListener();
       }
@@ -732,7 +729,6 @@
       }
     }
 
-    // Expose to global scope
     window.handleCreate = handleCreate;
     window.handleImport = handleImport;
     window.goHome = goHome;
@@ -748,7 +744,6 @@
     window.copy = copy;
     window.handleUnlock = handleUnlock;
 
-    // Initialize
     createWatermarks();
     render();
   </script>

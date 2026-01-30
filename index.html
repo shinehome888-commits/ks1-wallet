@@ -8,54 +8,286 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <style>
     :root {
-      --red: #DC2626;
-      --gold: #D4AF37;
+      --blue: #2563eb;        /* Vibrant KS1 Blue */
+      --gold: #d4af37;        /* Rich Gold/Yellow */
       --black: #000000;
-      --gray-900: #111827;
-      --gray-800: #1F2937;
-      --gray-700: #374151;
-      --gray-400: #9CA3AF;
-      --yellow-400: #FBBF24;
-      --blue-400: #60A5FA;
-      --green-500: #10B981;
+      --white: #ffffff;
+      --gray-900: #0f172a;
+      --gray-800: #1e293b;
+      --gray-700: #334155;
+      --light-gold: #fde047;
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     body {
       background-color: var(--black);
-      color: white;
-      font-family: system-ui, sans-serif;
-      line-height: 1.5;
-      padding: 16px;
+      color: var(--white);
+      font-family: 'Segoe UI', system-ui, sans-serif;
       min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
     }
-    .container { max-width: 500px; margin: 0 auto; }
+
+    /* ===== WATERMARK BACKGROUND ===== */
+    .watermark-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.03;
+      z-index: 0;
+      background-image: 
+        radial-gradient(circle, var(--white) 1px, transparent 1px),
+        repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 20px,
+          var(--white) 20px,
+          var(--white) 21px
+        );
+      background-size: 100px 100px, 100px 100px;
+    }
+
+    .watermark-text {
+      position: absolute;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      opacity: 0.02;
+      transform: rotate(-30deg);
+      white-space: nowrap;
+    }
+
+    /* Generate multiple "KS1 WALLET" watermarks */
+    .watermark-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ===== CONTENT LAYER ===== */
+    .content {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.85); /* Slightly transparent dark card */
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      border-radius: 20px;
+      padding: 32px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 
+        0 0 0 1px rgba(37, 99, 235, 0.3),
+        0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    h1, h2 {
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 16px;
+      background: linear-gradient(to right, var(--blue), var(--gold));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      text-align: center;
+    }
+
+    h2 {
+      font-size: 1.75rem;
+      text-align: center;
+    }
+
+    p {
+      margin-bottom: 16px;
+      line-height: 1.6;
+      color: #cbd5e1;
+    }
+
+    .disclaimer {
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--gold);
+      margin: 16px 0;
+      font-weight: 600;
+    }
+
     .btn {
-      display: block; width: 100%; padding: 12px; border: none; border-radius: 8px;
-      font-weight: 600; cursor: pointer; margin: 8px 0;
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 1.05rem;
+      cursor: pointer;
+      margin: 12px 0;
+      transition: all 0.2s ease;
+      letter-spacing: 0.5px;
     }
-    .btn-primary { background-color: var(--red); }
-    .btn-secondary { background-color: var(--gray-800); }
-    .btn:hover { opacity: 0.9; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--blue), #1d4ed8);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: rgba(212, 175, 55, 0.15);
+      color: var(--gold);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(212, 175, 55, 0.25);
+      box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+    }
+
     input, textarea, select {
-      width: 100%; padding: 12px; margin: 8px 0;
-      background: var(--gray-900); border: 1px solid var(--gray-700);
-      color: white; border-radius: 8px;
+      width: 100%;
+      padding: 14px;
+      margin: 10px 0;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      color: white;
+      border-radius: 12px;
+      font-size: 1rem;
     }
-    .card { background: var(--gray-900); padding: 16px; border-radius: 12px; margin: 16px 0; }
-    .flex { display: flex; gap: 8px; }
-    .center { text-align: center; }
-    .warning { background: rgba(251, 191, 36, 0.1); border: 1px solid var(--yellow-400); padding: 12px; border-radius: 8px; font-size: 0.875rem; }
-    .qr { text-align: center; margin: 20px 0; }
-    code { background: var(--gray-800); padding: 4px 8px; border-radius: 4px; font-family: monospace; }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+    }
+
+    .flex {
+      display: flex;
+      gap: 12px;
+    }
+
+    .center {
+      text-align: center;
+    }
+
+    .warning {
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid var(--gold);
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      margin: 16px 0;
+      color: var(--light-gold);
+    }
+
+    .qr {
+      text-align: center;
+      margin: 24px 0;
+    }
+
+    code {
+      background: rgba(30, 41, 59, 0.8);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.95rem;
+      border: 1px solid rgba(212, 175, 55, 0.3);
+    }
+
+    /* Educational tooltips */
+    .tooltip {
+      position: relative;
+      display: inline-block;
+      cursor: help;
+      color: var(--gold);
+    }
+
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 280px;
+      background-color: var(--gray-900);
+      color: #fff;
+      text-align: center;
+      border-radius: 8px;
+      padding: 10px;
+      position: absolute;
+      z-index: 100;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -140px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 0.85rem;
+      border: 1px solid var(--blue);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    /* Futuristic glow on focus */
+    .glow-on-focus:focus {
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.6), 0 0 15px rgba(37, 99, 235, 0.4);
+    }
   </style>
 </head>
 <body>
-  <div class="container" id="app">
-    <!-- Content will be rendered here by JS -->
+  <!-- Watermark Background -->
+  <div class="watermark-container" id="watermarkContainer"></div>
+
+  <!-- Main Content -->
+  <div class="content">
+    <div class="card" id="app">
+      <!-- App renders here -->
+    </div>
   </div>
 
   <script>
-    // ===== CONFIG =====
+    // Generate elegant "KS1 WALLET" watermarks
+    function createWatermarks() {
+      const container = document.getElementById('watermarkContainer');
+      const phrases = ['KS1 WALLET', 'SELF CUSTODY', 'WEB3 AFRICA'];
+      for (let i = 0; i < 30; i++) {
+        const div = document.createElement('div');
+        div.className = 'watermark-text';
+        div.textContent = phrases[i % phrases.length];
+        div.style.top = `${Math.random() * 100}%`;
+        div.style.left = `${Math.random() * 100}%`;
+        div.style.opacity = '0.02';
+        div.style.fontSize = `${18 + Math.random() * 12}px`;
+        container.appendChild(div);
+      }
+    }
+
+    // ===== REST OF APP (same logic, enhanced UI) =====
     const CHAINS = {
       1: { name: 'Ethereum', native: 'ETH', rpc: 'https://ethereum.publicnode.com', explorer: 'https://etherscan.io/tx/' },
       56: { name: 'BNB Chain', native: 'BNB', rpc: 'https://bsc.publicnode.com', explorer: 'https://bscscan.com/tx/' },
@@ -64,19 +296,19 @@
 
     const STORAGE_KEY = 'ks1_wallet_enc';
 
-    // ===== UTILS =====
     function copy(text) {
-      navigator.clipboard.writeText(text).then(() => alert('Copied!'));
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+      });
     }
 
     function generateQR(text) {
       const qr = qrcode(0, 'M');
       qr.addData(text);
       qr.make();
-      return qr.createImgTag(5, 10);
+      return qr.createImgTag(6, 12);
     }
 
-    // ===== WALLET STORAGE =====
     function saveWallet(json) {
       localStorage.setItem(STORAGE_KEY, json);
     }
@@ -95,7 +327,6 @@
       return !!localStorage.getItem(STORAGE_KEY);
     }
 
-    // ===== APP STATE =====
     let state = {
       view: 'landing',
       wallet: null,
@@ -105,7 +336,6 @@
       error: ''
     };
 
-    // ===== RENDERING =====
     function render() {
       const app = document.getElementById('app');
       app.innerHTML = '';
@@ -117,19 +347,25 @@
           return;
         }
         app.innerHTML = `
-          <h1 class="text-3xl font-bold mb-4" style="color: var(--red);">KS1 Wallet</h1>
-          <p class="text-gray-400 mb-6 text-center">
-            Non-custodial, open-source wallet.<br/>
-            <span style="color: var(--yellow-400);">We never access your funds.</span>
+          <h1>KS1 Wallet</h1>
+          <p class="disclaimer">Non-custodial • Open-source • Africa-built</p>
+          <p style="text-align:center; color:#94a3b8; margin:20px 0;">
+            Your keys, your crypto. We never access your funds.
           </p>
-          <button class="btn btn-primary" onclick="handleCreate()">Create Wallet</button>
+          <button class="btn btn-primary" onclick="handleCreate()">Create New Wallet</button>
           <button class="btn btn-secondary" onclick="handleImport()">Import Wallet</button>
+          <div style="margin-top:24px; text-align:center; font-size:0.85rem; color:#64748b;">
+            <span class="tooltip">?
+              <span class="tooltiptext">KS1 Wallet is a free, open-source tool to learn and manage crypto safely.</span>
+            </span>
+            What is a non-custodial wallet?
+          </div>
         `;
         return;
       }
 
       if (state.view === 'unlock') {
-        const pwd = prompt('Enter your password to unlock:');
+        const pwd = prompt('🔐 Enter your password to unlock your wallet:');
         if (pwd) {
           loadWallet(pwd).then(w => {
             if (w) {
@@ -138,7 +374,7 @@
               state.view = 'dashboard';
               fetchBalance();
             } else {
-              alert('Invalid password');
+              alert('❌ Incorrect password');
               state.view = 'landing';
             }
             render();
@@ -152,10 +388,10 @@
 
       if (state.view === 'create') {
         app.innerHTML = `
-          <h2 class="text-2xl mb-4">Create Password</h2>
-          <p class="text-gray-400 mb-4">Use 8+ characters. Needed to unlock your wallet.</p>
-          <input type="password" id="create-pwd" placeholder="Password" />
-          ${state.error ? `<p style="color: var(--red);">${state.error}</p>` : ''}
+          <h2>Create Wallet</h2>
+          <p>Set a strong password (8+ characters). You’ll need it to access your wallet.</p>
+          <input type="password" id="create-pwd" placeholder="Password" class="glow-on-focus" />
+          ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
           <button class="btn btn-primary" onclick="handleCreateSubmit()">Continue</button>
           <button class="btn btn-secondary" onclick="goHome()">Back</button>
         `;
@@ -164,34 +400,42 @@
 
       if (state.view === 'show-mnemonic') {
         app.innerHTML = `
-          <h2 class="text-2xl mb-4">Your Recovery Phrase</h2>
-          <p class="warning">⚠️ Write this down. Store it offline. Never share it.</p>
-          <div class="card" style="font-family: monospace; word-break: break-word;">${state.mnemonic}</div>
-          <button class="btn btn-primary" onclick="handleConfirmMnemonic()">I've saved it securely</button>
+          <h2>Your Recovery Phrase</h2>
+          <div class="warning">
+            ⚠️ <strong>Write this down!</strong> Store it offline. Never share it with anyone.
+          </div>
+          <div style="background:rgba(30,41,59,0.9); padding:16px; border-radius:12px; font-family:monospace; word-break:break-word; font-size:1.1rem; line-height:1.6;">
+            ${state.mnemonic}
+          </div>
+          <button class="btn btn-primary" onclick="handleConfirmMnemonic()" style="margin-top:20px;">I’ve Saved It Securely</button>
         `;
         return;
       }
 
       if (state.view === 'confirm-mnemonic') {
-        const words = state.mnemonic.split(' ');
         app.innerHTML = `
-          <h2 class="text-2xl mb-4">Confirm Recovery Phrase</h2>
-          <p class="text-gray-400 mb-4">Enter word #3, #6, and #10</p>
-          <input id="word3" placeholder="Word #3" />
-          <input id="word6" placeholder="Word #6" />
-          <input id="word10" placeholder="Word #10" />
-          ${state.error ? `<p style="color: var(--red);">${state.error}</p>` : ''}
-          <button class="btn btn-primary" onclick="handleConfirmWords()">Confirm & Continue</button>
+          <h2>Confirm Your Phrase</h2>
+          <p>To verify you saved it, enter:</p>
+          <ul style="text-align:left; margin:12px 0; padding-left:20px; color:#94a3b8;">
+            <li>Word #3</li>
+            <li>Word #6</li>
+            <li>Word #10</li>
+          </ul>
+          <input id="word3" placeholder="Word #3" class="glow-on-focus" />
+          <input id="word6" placeholder="Word #6" class="glow-on-focus" />
+          <input id="word10" placeholder="Word #10" class="glow-on-focus" />
+          ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
+          <button class="btn btn-primary" onclick="handleConfirmWords()">Verify & Continue</button>
         `;
         return;
       }
 
       if (state.view === 'import') {
         app.innerHTML = `
-          <h2 class="text-2xl mb-4">Import Wallet</h2>
-          <textarea id="import-seed" placeholder="Enter your 12-word recovery phrase" rows="3"></textarea>
-          <input type="password" id="import-pwd" placeholder="Set a password (8+ chars)" />
-          ${state.error ? `<p style="color: var(--red);">${state.error}</p>` : ''}
+          <h2>Import Wallet</h2>
+          <textarea id="import-seed" placeholder="Paste your 12-word recovery phrase" rows="3" class="glow-on-focus"></textarea>
+          <input type="password" id="import-pwd" placeholder="Set a new password (8+ chars)" class="glow-on-focus" />
+          ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
           <button class="btn btn-primary" onclick="handleImportSubmit()">Import Wallet</button>
           <button class="btn btn-secondary" onclick="goHome()">Back</button>
         `;
@@ -200,29 +444,33 @@
 
       if (state.view === 'dashboard') {
         app.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-            <h1 class="text-2xl font-bold" style="color: var(--red);">KS1 Wallet</h1>
-            <select id="chain-select" class="btn btn-secondary" style="width: auto;">
+          <h2>Dashboard</h2>
+          <div style="display:flex; justify-content:space-between; margin:16px 0;">
+            <select id="chain-select" class="btn btn-secondary" style="width:auto; padding:8px 16px; font-size:0.95rem;">
               <option value="1">Ethereum</option>
               <option value="56">BNB Chain</option>
               <option value="137">Polygon</option>
             </select>
+            <span style="color:#94a3b8;">${state.balance} ${CHAINS[state.chainId].native}</span>
           </div>
 
-          <div class="card">
-            <div class="flex" style="justify-content: space-between;">
+          <div style="background:rgba(30,41,59,0.7); border-radius:12px; padding:16px; margin:20px 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
               <code>${state.address.slice(0,6)}...${state.address.slice(-4)}</code>
-              <button onclick="copy('${state.address}')">📋</button>
+              <button onclick="copy('${state.address}')" style="background:none; border:none; color:var(--gold); font-size:1.2rem;">📋</button>
             </div>
-          </div>
-
-          <div class="card">
-            <p>Balance: ${state.balance} ${CHAINS[state.chainId].native}</p>
           </div>
 
           <div class="flex">
             <button class="btn btn-primary" onclick="goSend()">Send</button>
             <button class="btn btn-secondary" onclick="goReceive()">Receive</button>
+          </div>
+
+          <div style="margin-top:24px; text-align:center; font-size:0.85rem; color:#64748b;">
+            <span class="tooltip">💡
+              <span class="tooltiptext">Gas is the fee paid to miners. Higher gas = faster transaction.</span>
+            </span>
+            Why do I pay gas fees?
           </div>
         `;
         document.getElementById('chain-select').value = state.chainId;
@@ -236,17 +484,17 @@
 
       if (state.view === 'send') {
         app.innerHTML = `
-          <h2 class="text-2xl mb-4">Send</h2>
-          <select id="send-chain" class="btn btn-secondary" style="margin-bottom: 12px;">
-            <option value="1">Ethereum</option>
-            <option value="56">BNB Chain</option>
-            <option value="137">Polygon</option>
+          <h2>Send Crypto</h2>
+          <select id="send-chain" class="btn btn-secondary" style="margin-bottom:12px; padding:8px 16px;">
+            <option value="1">Ethereum (ETH)</option>
+            <option value="56">BNB Chain (BNB)</option>
+            <option value="137">Polygon (MATIC)</option>
           </select>
-          <input id="send-to" placeholder="Recipient address" />
-          <input id="send-amount" placeholder="Amount (${CHAINS[state.chainId].native})" type="number" step="0.0001" />
-          ${state.error ? `<p style="color: var(--red);">${state.error}</p>` : ''}
-          <button class="btn btn-primary" onclick="handleSend()">Send</button>
-          <button class="btn btn-secondary" onclick="goDashboard()">Back</button>
+          <input id="send-to" placeholder="Recipient address (0x...)" class="glow-on-focus" />
+          <input id="send-amount" placeholder="Amount" type="number" step="0.0001" class="glow-on-focus" />
+          ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
+          <button class="btn btn-primary" onclick="handleSend()">Preview Transaction</button>
+          <button class="btn btn-secondary" onclick="goDashboard()">Cancel</button>
         `;
         document.getElementById('send-chain').value = state.chainId;
         document.getElementById('send-chain').onchange = (e) => {
@@ -258,11 +506,13 @@
 
       if (state.view === 'send-confirm') {
         app.innerHTML = `
-          <h2 class="text-2xl mb-4">Confirm Transaction</h2>
-          <p>Sending ${state.sendAmount} ${CHAINS[state.chainId].native}</p>
-          <p>To: ${state.sendTo}</p>
-          <p>Network: ${CHAINS[state.chainId].name}</p>
-          <input type="password" id="send-pwd" placeholder="Enter password" style="margin: 16px 0;" />
+          <h2>Confirm Send</h2>
+          <div style="background:rgba(30,41,59,0.7); padding:16px; border-radius:12px; margin:16px 0;">
+            <p><strong>Amount:</strong> ${state.sendAmount} ${CHAINS[state.chainId].native}</p>
+            <p><strong>To:</strong> ${state.sendTo.slice(0,10)}...${state.sendTo.slice(-4)}</p>
+            <p><strong>Network:</strong> ${CHAINS[state.chainId].name}</p>
+          </div>
+          <input type="password" id="send-pwd" placeholder="Enter password to sign" class="glow-on-focus" style="margin:16px 0;" />
           <button class="btn btn-primary" onclick="handleSendConfirm()">Confirm & Send</button>
           <button class="btn btn-secondary" onclick="goSend()">Cancel</button>
         `;
@@ -272,10 +522,10 @@
       if (state.view === 'send-success') {
         const url = CHAINS[state.chainId].explorer + state.txHash;
         app.innerHTML = `
-          <h2 class="text-2xl mb-4" style="color: var(--green-500);">Sent!</h2>
-          <p>Transaction confirmed.</p>
-          <a href="${url}" target="_blank" class="btn btn-secondary" style="margin-top: 16px;">View on Explorer</a>
-          <button class="btn btn-primary" onclick="goDashboard()" style="margin-top: 16px;">Back to Dashboard</button>
+          <h2 style="color:#10b981;">✅ Sent Successfully!</h2>
+          <p style="text-align:center; margin:20px 0;">Your transaction is confirmed.</p>
+          <a href="${url}" target="_blank" class="btn btn-secondary" style="display:inline-block; width:auto; padding:12px 24px;">View on Explorer</a>
+          <button class="btn btn-primary" onclick="goDashboard()" style="margin-top:16px;">Back to Wallet</button>
         `;
         return;
       }
@@ -283,20 +533,23 @@
       if (state.view === 'receive') {
         const qrHtml = generateQR(state.address);
         app.innerHTML = `
-          <h2 class="text-2xl mb-4">Receive</h2>
+          <h2>Receive Crypto</h2>
           <div class="qr">${qrHtml}</div>
-          <div class="flex" style="justify-content: center; margin: 16px 0;">
-            <code>${state.address.slice(0,6)}...${state.address.slice(-4)}</code>
-            <button onclick="copy('${state.address}')">📋</button>
+          <div style="margin:16px 0; text-align:center;">
+            <code>${state.address}</code>
+            <button onclick="copy('${state.address}')" style="background:none; border:none; color:var(--gold); margin-left:10px;">📋</button>
           </div>
-          <p class="warning">Only send ${CHAINS[state.chainId].native} on ${CHAINS[state.chainId].name}</p>
+          <div class="warning">
+            ⚠️ Only send <strong>${CHAINS[state.chainId].native}</strong> on <strong>${CHAINS[state.chainId].name}</strong>.
+            Sending other tokens may result in permanent loss.
+          </div>
           <button class="btn btn-secondary" onclick="goDashboard()">Back</button>
         `;
         return;
       }
     }
 
-    // ===== ACTIONS =====
+    // ===== ACTIONS (same as before) =====
     function goHome() { state.view = 'landing'; state.error = ''; render(); }
     function goDashboard() { state.view = 'dashboard'; state.error = ''; render(); }
     function goSend() { state.view = 'send'; state.error = ''; render(); }
@@ -364,7 +617,7 @@
     }
 
     async function fetchBalance() {
-      state.balance = '...';
+      state.balance = 'Loading...';
       render();
       const provider = new ethers.JsonRpcProvider(CHAINS[state.chainId].rpc);
       const bal = await provider.getBalance(state.address);
@@ -377,7 +630,7 @@
       const amount = document.getElementById('send-amount').value;
       const chainId = Number(document.getElementById('send-chain').value);
       if (!ethers.isAddress(to)) {
-        state.error = 'Invalid recipient address';
+        state.error = 'Invalid Ethereum address';
         render();
         return;
       }
@@ -397,7 +650,7 @@
       const pwd = document.getElementById('send-pwd').value;
       const wallet = await loadWallet(pwd);
       if (!wallet) {
-        alert('Invalid password');
+        alert('❌ Invalid password');
         return;
       }
       try {
@@ -412,12 +665,12 @@
         state.view = 'send-success';
         render();
       } catch (err) {
-        alert('Transaction failed: ' + err.message);
+        alert('Transaction failed: ' + (err.reason || err.message));
         goSend();
       }
     }
 
-    // ===== START APP =====
+    // Expose functions to global scope
     window.handleCreate = handleCreate;
     window.handleImport = handleImport;
     window.goHome = goHome;
@@ -432,6 +685,8 @@
     window.handleSendConfirm = handleSendConfirm;
     window.copy = copy;
 
+    // Initialize
+    createWatermarks();
     render();
   </script>
 </body>

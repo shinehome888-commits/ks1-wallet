@@ -264,6 +264,20 @@
   </div>
 
   <script>
+    // ===== NETWORK REGISTRY (STEP 1) =====
+    const SUPPORTED_NETWORKS = [
+      { id: 1, name: 'Ethereum', symbol: 'ETH', type: 'evm' },
+      { id: 56, name: 'BNB Chain', symbol: 'BNB', type: 'evm' },
+      { id: 137, name: 'Polygon', symbol: 'MATIC', type: 'evm' },
+      { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', type: 'bitcoin' } // ← ADDED BITCOIN
+    ];
+
+    const CHAINS = {
+      1: { rpc: 'https://ethereum.publicnode.com', explorer: 'https://etherscan.io/tx/' },
+      56: { rpc: 'https://bsc.publicnode.com', explorer: 'https://bscscan.com/tx/' },
+      137: { rpc: 'https://polygon-bor.publicnode.com', explorer: 'https://polygonscan.com/tx/' }
+    };
+
     // ===== AUTO-LOGOUT SYSTEM =====
     let inactivityTimer;
     const INACTIVITY_TIMEOUT = 60 * 1000; // 1 minute
@@ -323,17 +337,10 @@
       const seed = bip39.mnemonicToSeedSync(mnemonic);
       const master = bip32.HDKey.fromMasterSeed(seed);
       const child = master.derive("m/84'/0'/0'/0/0");
-      
-      // Get compressed public key
       const pubKey = child.publicKey;
       if (!pubKey) throw new Error('No public key');
-      
-      // SHA256 hash
       const hash = nobleHashes.sha256.create().update(pubKey).digest();
-      
-      // Bech32 encode
-      const address = bech32Encode('bc', 0, hash);
-      return { mnemonic, address };
+      return { mnemonic, address: bech32Encode('bc', 0, hash) };
     }
 
     function deriveBitcoinAddressFromMnemonic(mnemonic) {
@@ -354,7 +361,7 @@
       try {
         const res = await fetch(`https://api.blockcypher.com/v1/btc/main/addrs/${address}/balance`);
         const data = await res.json();
-        return (data.balance || 0) / 100000000; // satoshis → BTC
+        return (data.balance || 0) / 100000000;
       } catch {
         return 0;
       }
@@ -364,18 +371,13 @@
       return `bitcoin:${recipient}?amount=${amountBTC}`;
     }
 
-    // Bech32 encoder (simplified for native segwit)
+    // Bech32 encoder
     function bech32Encode(hrp, version, program) {
       const CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
       const expanded = new Uint8Array(program.length * 2);
       for (let i = 0; i < program.length; i++) {
         expanded[i * 2] = program[i] >> 5;
         expanded[i * 2 + 1] = program[i] & 31;
-      }
-      
-      let value = version;
-      for (const byte of expanded) {
-        value = (value << 5) ^ byte;
       }
       
       let checksum = 1;
@@ -443,23 +445,20 @@
       }
     }
 
-    // ===== CHAIN CONFIG =====
-    const CHAINS = {
-      1: { name: 'Ethereum', native: 'ETH', rpc: 'https://ethereum.publicnode.com', explorer: 'https://etherscan.io/tx/' },
-      56: { name: 'BNB Chain', native: 'BNB', rpc: 'https://bsc.publicnode.com', explorer: 'https://bscscan.com/tx/' },
-      137: { name: 'Polygon', native: 'MATIC', rpc: 'https://polygon-bor.publicnode.com', explorer: 'https://polygonscan.com/tx/' }
-    };
-
     // ===== APP STATE =====
     let state = {
       view: 'landing',
       wallet: null,
       address: '',
       balance: '...',
-      chainId: 1, // 1=ETH, 56=BNB, 137=Polygon, 'btc'=Bitcoin
-      error: '',
-      isBitcoin: false
+      selectedNetworkId: 1, // Default to Ethereum
+      error: ''
     };
+
+    // Get current network object
+    function getCurrentNetwork() {
+      return SUPPORTED_NETWORKS.find(n => n.id === state.selectedNetworkId);
+    }
 
     // ===== RENDERING =====
     function render() {
@@ -505,12 +504,16 @@
       }
 
       if (state.view === 'create') {
+        // Build network options from registry
+        const networkOptions = SUPPORTED_NETWORKS.map(net => 
+          `<option value="${net.id}">${net.name} (${net.symbol})</option>`
+        ).join('');
+
         app.innerHTML = `
           <h2>Create Wallet</h2>
           <p>Set a strong password (8+ characters). You’ll need it to access your wallet.</p>
           <select id="create-network" class="btn btn-secondary" style="margin-bottom:12px;">
-            <option value="evm">Ethereum / BNB / Polygon</option>
-            <option value="bitcoin">Bitcoin (BTC)</option>
+            ${networkOptions}
           </select>
           <input type="password" id="create-pwd" placeholder="Password" class="glow-on-focus" />
           ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
@@ -553,11 +556,14 @@
       }
 
       if (state.view === 'import') {
+        const networkOptions = SUPPORTED_NETWORKS.map(net => 
+          `<option value="${net.id}">${net.name} (${net.symbol})</option>`
+        ).join('');
+
         app.innerHTML = `
           <h2>Import Wallet</h2>
           <select id="import-network" class="btn btn-secondary" style="margin-bottom:12px;">
-            <option value="evm">Ethereum / BNB / Polygon</option>
-            <option value="bitcoin">Bitcoin (BTC)</option>
+            ${networkOptions}
           </select>
           <textarea id="import-seed" placeholder="Paste your 12-word recovery phrase" rows="3" class="glow-on-focus"></textarea>
           <input type="password" id="import-pwd" placeholder="Set a new password (8+ chars)" class="glow-on-focus" />
@@ -569,19 +575,24 @@
       }
 
       if (state.view === 'dashboard') {
-        const isBitcoin = state.chainId === 'btc';
-        const networkName = isBitcoin ? 'Bitcoin (BTC)' : CHAINS[state.chainId].name;
-        const balanceDisplay = isBitcoin ? `${state.balance} BTC` : `${state.balance} ${CHAINS[state.chainId].native}`;
+        const currentNetwork = getCurrentNetwork();
+        const isBitcoin = currentNetwork.type === 'bitcoin';
+        const balanceDisplay = isBitcoin 
+          ? `${parseFloat(state.balance).toFixed(8)} BTC`
+          : `${parseFloat(state.balance).toFixed(4)} ${currentNetwork.symbol}`;
 
         let networkSelector = '';
         if (!isBitcoin) {
+          const evmOptions = SUPPORTED_NETWORKS
+            .filter(n => n.type === 'evm')
+            .map(n => `<option value="${n.id}">${n.name}</option>`)
+            .join('');
+          
           networkSelector = `
             <div style="margin: 20px 0;">
               <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">Network</label>
               <select id="chain-select" class="btn btn-secondary" style="width:100%; padding:12px; background:rgba(212,175,55,0.1); color:var(--gold); border:1px solid var(--gold);">
-                <option value="1">Ethereum</option>
-                <option value="56">BNB Chain</option>
-                <option value="137">Polygon</option>
+                ${evmOptions}
               </select>
             </div>
           `;
@@ -593,7 +604,7 @@
           ${networkSelector}
 
           <div style="margin: 20px 0; text-align:center;">
-            <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">${networkName}</label>
+            <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">${currentNetwork.name} (${currentNetwork.symbol})</label>
             <div style="font-size:1.8rem; font-weight:700; color:var(--gold);">${balanceDisplay}</div>
           </div>
 
@@ -626,9 +637,9 @@
         `;
 
         if (!isBitcoin) {
-          document.getElementById('chain-select').value = state.chainId;
+          document.getElementById('chain-select').value = state.selectedNetworkId;
           document.getElementById('chain-select').onchange = (e) => {
-            state.chainId = Number(e.target.value);
+            state.selectedNetworkId = Number(e.target.value);
             fetchBalance();
             render();
           };
@@ -637,14 +648,19 @@
       }
 
       if (state.view === 'send') {
-        const isBitcoin = state.chainId === 'btc';
+        const currentNetwork = getCurrentNetwork();
+        const isBitcoin = currentNetwork.type === 'bitcoin';
         let networkSelect = '';
+        
         if (!isBitcoin) {
+          const evmOptions = SUPPORTED_NETWORKS
+            .filter(n => n.type === 'evm')
+            .map(n => `<option value="${n.id}">${n.name} (${n.symbol})</option>`)
+            .join('');
+          
           networkSelect = `
             <select id="send-chain" class="btn btn-secondary" style="margin-bottom:12px; padding:8px 16px; background:rgba(212,175,55,0.1); color:var(--gold);">
-              <option value="1">Ethereum (ETH)</option>
-              <option value="56">BNB Chain (BNB)</option>
-              <option value="137">Polygon (MATIC)</option>
+              ${evmOptions}
             </select>
           `;
         }
@@ -660,9 +676,9 @@
         `;
 
         if (!isBitcoin) {
-          document.getElementById('send-chain').value = state.chainId;
+          document.getElementById('send-chain').value = state.selectedNetworkId;
           document.getElementById('send-chain').onchange = (e) => {
-            state.chainId = Number(e.target.value);
+            state.selectedNetworkId = Number(e.target.value);
             render();
           };
         }
@@ -670,16 +686,18 @@
       }
 
       if (state.view === 'send-confirm') {
-        const isBitcoin = state.chainId === 'btc';
-        const networkName = isBitcoin ? 'Bitcoin' : CHAINS[state.chainId].name;
-        const amountDisplay = isBitcoin ? `${state.sendAmount} BTC` : `${state.sendAmount} ${CHAINS[state.chainId].native}`;
+        const currentNetwork = getCurrentNetwork();
+        const isBitcoin = currentNetwork.type === 'bitcoin';
+        const amountDisplay = isBitcoin 
+          ? `${state.sendAmount} BTC`
+          : `${state.sendAmount} ${currentNetwork.symbol}`;
 
         app.innerHTML = `
           <h2>Confirm Send</h2>
           <div style="background:rgba(30,41,59,0.7); padding:16px; border-radius:12px; margin:16px 0;">
             <p><strong>Amount:</strong> ${amountDisplay}</p>
             <p><strong>To:</strong> ${state.sendTo.slice(0,10)}...${state.sendTo.slice(-4)}</p>
-            <p><strong>Network:</strong> ${networkName}</p>
+            <p><strong>Network:</strong> ${currentNetwork.name}</p>
           </div>
           <input type="password" id="send-pwd" placeholder="Enter password to sign" class="glow-on-focus" style="margin:16px 0;" />
           <button class="btn btn-primary" onclick="handleSendConfirm()">Confirm & Send</button>
@@ -689,10 +707,11 @@
       }
 
       if (state.view === 'send-success') {
-        const isBitcoin = state.chainId === 'btc';
+        const currentNetwork = getCurrentNetwork();
+        const isBitcoin = currentNetwork.type === 'bitcoin';
         let explorerLink = '';
         if (!isBitcoin) {
-          const url = CHAINS[state.chainId].explorer + state.txHash;
+          const url = CHAINS[state.selectedNetworkId].explorer + state.txHash;
           explorerLink = `<a href="${url}" target="_blank" class="btn btn-secondary" style="display:inline-block; width:auto; padding:12px 24px;">View on Explorer</a>`;
         }
 
@@ -707,10 +726,11 @@
 
       if (state.view === 'receive') {
         const qrHtml = generateQR(state.address);
-        const isBitcoin = state.chainId === 'btc';
+        const currentNetwork = getCurrentNetwork();
+        const isBitcoin = currentNetwork.type === 'bitcoin';
         const warningText = isBitcoin 
           ? `⚠️ Only send <strong>BTC</strong> to this address. Sending other coins may result in permanent loss.`
-          : `⚠️ Only send <strong>${CHAINS[state.chainId].native}</strong> on <strong>${CHAINS[state.chainId].name}</strong>.`;
+          : `⚠️ Only send <strong>${currentNetwork.symbol}</strong> on <strong>${currentNetwork.name}</strong>.`;
 
         app.innerHTML = `
           <h2>Receive Crypto</h2>
@@ -762,8 +782,7 @@
       if (wallet) {
         state.wallet = wallet;
         state.address = wallet.address;
-        state.isBitcoin = false;
-        state.chainId = 1;
+        state.selectedNetworkId = 1; // Default to Ethereum after unlock
         state.view = 'dashboard';
         fetchBalance();
         render();
@@ -781,7 +800,8 @@
     
     async function handleCreateSubmit() {
       const pwd = document.getElementById('create-pwd').value;
-      const network = document.getElementById('create-network').value;
+      const networkId = document.getElementById('create-network').value;
+      const selectedNetwork = SUPPORTED_NETWORKS.find(n => String(n.id) === networkId);
       
       if (pwd.length < 8) {
         state.error = 'Password must be at least 8 characters';
@@ -789,15 +809,12 @@
         return;
       }
 
-      if (network === 'bitcoin') {
+      if (selectedNetwork.type === 'bitcoin') {
         try {
           const { mnemonic, address } = await createBitcoinWallet();
-          // For Phase 1, we don't store Bitcoin mnemonics encrypted
-          // User must save it manually (like MetaMask)
           state.mnemonic = mnemonic;
           state.address = address;
-          state.chainId = 'btc';
-          state.isBitcoin = true;
+          state.selectedNetworkId = 'bitcoin';
           state.view = 'show-mnemonic';
           render();
         } catch (err) {
@@ -809,6 +826,7 @@
         const mnemonic = wallet.mnemonic.phrase;
         await wallet.encrypt(pwd).then(json => saveWallet(json));
         state.mnemonic = mnemonic;
+        state.selectedNetworkId = selectedNetwork.id;
         state.view = 'show-mnemonic';
         render();
       }
@@ -825,7 +843,8 @@
       const w6 = document.getElementById('word6').value.trim().toLowerCase();
       const w10 = document.getElementById('word10').value.trim().toLowerCase();
       if (w3 === words[2] && w6 === words[5] && w10 === words[9]) {
-        if (state.chainId === 'btc') {
+        const currentNetwork = getCurrentNetwork();
+        if (currentNetwork.type === 'bitcoin') {
           state.view = 'dashboard';
           fetchBalance();
           render();
@@ -851,7 +870,8 @@
     async function handleImportSubmit() {
       const seed = document.getElementById('import-seed').value.trim();
       const pwd = document.getElementById('import-pwd').value;
-      const network = document.getElementById('import-network').value;
+      const networkId = document.getElementById('import-network').value;
+      const selectedNetwork = SUPPORTED_NETWORKS.find(n => String(n.id) === networkId);
       
       if (pwd.length < 8) {
         state.error = 'Password must be 8+ characters';
@@ -859,15 +879,14 @@
         return;
       }
 
-      if (network === 'bitcoin') {
+      if (selectedNetwork.type === 'bitcoin') {
         try {
           if (!bip39.validateMnemonic(seed, bip39.wordlists.english)) {
             throw new Error('Invalid');
           }
           const address = deriveBitcoinAddressFromMnemonic(seed);
           state.address = address;
-          state.chainId = 'btc';
-          state.isBitcoin = true;
+          state.selectedNetworkId = 'bitcoin';
           state.view = 'dashboard';
           fetchBalance();
           render();
@@ -881,6 +900,7 @@
           await wallet.encrypt(pwd).then(json => saveWallet(json));
           state.wallet = wallet;
           state.address = wallet.address;
+          state.selectedNetworkId = selectedNetwork.id;
           state.view = 'dashboard';
           fetchBalance();
           render();
@@ -895,13 +915,14 @@
       state.balance = 'Loading...';
       render();
       
-      if (state.chainId === 'btc') {
+      const currentNetwork = getCurrentNetwork();
+      if (currentNetwork.type === 'bitcoin') {
         const bal = await getBitcoinBalance(state.address);
-        state.balance = bal.toFixed(8);
+        state.balance = bal;
       } else {
-        const provider = new ethers.JsonRpcProvider(CHAINS[state.chainId].rpc);
+        const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
         const bal = await provider.getBalance(state.address);
-        state.balance = parseFloat(ethers.formatEther(bal)).toFixed(4);
+        state.balance = parseFloat(ethers.formatEther(bal));
       }
       render();
     }
@@ -909,7 +930,8 @@
     async function handleSend() {
       const to = document.getElementById('send-to').value;
       const amount = document.getElementById('send-amount').value;
-      const isBitcoin = state.chainId === 'btc';
+      const currentNetwork = getCurrentNetwork();
+      const isBitcoin = currentNetwork.type === 'bitcoin';
       
       if (isBitcoin) {
         if (!isValidBitcoinAddress(to)) {
@@ -939,13 +961,12 @@
 
     async function handleSendConfirm() {
       const pwd = document.getElementById('send-pwd').value;
-      const isBitcoin = state.chainId === 'btc';
+      const currentNetwork = getCurrentNetwork();
+      const isBitcoin = currentNetwork.type === 'bitcoin';
       
       if (isBitcoin) {
-        // Open bitcoin: URI in external wallet
         const uri = sendBitcoinURI(state.sendTo, state.sendAmount);
         window.location.href = uri;
-        // After sending, return to dashboard
         setTimeout(() => {
           state.view = 'send-success';
           render();
@@ -957,7 +978,7 @@
           return;
         }
         try {
-          const provider = new ethers.JsonRpcProvider(CHAINS[state.chainId].rpc);
+          const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
           const signer = wallet.connect(provider);
           const tx = await signer.sendTransaction({
             to: state.sendTo,

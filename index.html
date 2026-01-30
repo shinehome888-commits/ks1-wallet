@@ -8,8 +8,8 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <style>
     :root {
-      --blue: #2563eb;        /* Vibrant KS1 Blue */
-      --gold: #d4af37;        /* Rich Gold/Yellow */
+      --blue: #2563eb;
+      --gold: #d4af37;
       --black: #000000;
       --white: #ffffff;
       --gray-900: #0f172a;
@@ -33,7 +33,6 @@
       overflow-x: hidden;
     }
 
-    /* ===== WATERMARK BACKGROUND — BRIGHTER & CLEARER ===== */
     .watermark-container {
       position: fixed;
       top: 0;
@@ -50,14 +49,13 @@
       font-weight: 800;
       letter-spacing: 3px;
       text-transform: uppercase;
-      opacity: 0.06; /* ← Increased from 0.02 to 0.06 for visibility */
+      opacity: 0.06;
       transform: rotate(-30deg);
       white-space: nowrap;
       color: var(--white);
       text-shadow: 0 0 8px rgba(255,255,255,0.3);
     }
 
-    /* ===== CONTENT LAYER ===== */
     .content {
       position: relative;
       z-index: 10;
@@ -96,7 +94,6 @@
       color: transparent;
     }
 
-    /* Dashboard heading in BLUE */
     .dashboard-title {
       color: var(--blue);
       font-size: 1.8rem;
@@ -135,7 +132,6 @@
       color: white;
     }
 
-    /* Receive button now BLUE */
     .btn-receive {
       background: linear-gradient(135deg, var(--blue), #1d4ed8);
       color: white;
@@ -252,40 +248,42 @@
   </div>
 
   <script>
-    // Generate brighter watermarks
-    function createWatermarks() {
-      const container = document.getElementById('watermarkContainer');
-      const phrases = ['KS1 WALLET', 'SELF CUSTODY', 'WEB3 AFRICA'];
-      for (let i = 0; i < 30; i++) {
-        const div = document.createElement('div');
-        div.className = 'watermark-text';
-        div.textContent = phrases[i % phrases.length];
-        div.style.top = `${Math.random() * 100}%`;
-        div.style.left = `${Math.random() * 100}%`;
-        div.style.opacity = '0.06'; // ← Visible on phone & desktop
-        div.style.fontSize = `${18 + Math.random() * 10}px`;
-        container.appendChild(div);
-      }
+    // ===== AUTO-LOGOUT SYSTEM =====
+    let inactivityTimer;
+    const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+
+    function resetInactivityTimer() {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(logout, INACTIVITY_TIMEOUT);
     }
 
-    const CHAINS = {
-      1: { name: 'Ethereum', native: 'ETH', rpc: 'https://ethereum.publicnode.com', explorer: 'https://etherscan.io/tx/' },
-      56: { name: 'BNB Chain', native: 'BNB', rpc: 'https://bsc.publicnode.com', explorer: 'https://bscscan.com/tx/' },
-      137: { name: 'Polygon', native: 'MATIC', rpc: 'https://polygon-bor.publicnode.com', explorer: 'https://polygonscan.com/tx/' }
-    };
+    function startInactivityListener() {
+      ['mousemove', 'click', 'touchstart', 'keydown'].forEach(event => {
+        document.addEventListener(event, resetInactivityTimer, true);
+      });
+      resetInactivityTimer();
+    }
 
+    function stopInactivityListener() {
+      clearTimeout(inactivityTimer);
+      ['mousemove', 'click', 'touchstart', 'keydown'].forEach(event => {
+        document.removeEventListener(event, resetInactivityTimer, true);
+      });
+    }
+
+    function logout() {
+      // Clear in-memory wallet (do NOT delete from localStorage)
+      state.wallet = null;
+      state.address = '';
+      state.balance = '...';
+      state.view = 'landing';
+      render();
+      stopInactivityListener();
+      console.log('Auto-logout due to inactivity');
+    }
+
+    // ===== WALLET STORAGE =====
     const STORAGE_KEY = 'ks1_wallet_enc';
-
-    function copy(text) {
-      navigator.clipboard.writeText(text).then(() => alert('Copied!'));
-    }
-
-    function generateQR(text) {
-      const qr = qrcode(0, 'M');
-      qr.addData(text);
-      qr.make();
-      return qr.createImgTag(6, 12);
-    }
 
     function saveWallet(json) {
       localStorage.setItem(STORAGE_KEY, json);
@@ -301,10 +299,46 @@
       }
     }
 
-    function hasWallet() {
+    function hasSavedWallet() {
       return !!localStorage.getItem(STORAGE_KEY);
     }
 
+    // ===== UTILS =====
+    function copy(text) {
+      navigator.clipboard.writeText(text).then(() => alert('Copied!'));
+    }
+
+    function generateQR(text) {
+      const qr = qrcode(0, 'M');
+      qr.addData(text);
+      qr.make();
+      return qr.createImgTag(6, 12);
+    }
+
+    // ===== WATERMARKS =====
+    function createWatermarks() {
+      const container = document.getElementById('watermarkContainer');
+      const phrases = ['KS1 WALLET', 'SELF CUSTODY', 'WEB3 AFRICA'];
+      for (let i = 0; i < 30; i++) {
+        const div = document.createElement('div');
+        div.className = 'watermark-text';
+        div.textContent = phrases[i % phrases.length];
+        div.style.top = `${Math.random() * 100}%`;
+        div.style.left = `${Math.random() * 100}%`;
+        div.style.opacity = '0.06';
+        div.style.fontSize = `${18 + Math.random() * 10}px`;
+        container.appendChild(div);
+      }
+    }
+
+    // ===== CHAIN CONFIG =====
+    const CHAINS = {
+      1: { name: 'Ethereum', native: 'ETH', rpc: 'https://ethereum.publicnode.com', explorer: 'https://etherscan.io/tx/' },
+      56: { name: 'BNB Chain', native: 'BNB', rpc: 'https://bsc.publicnode.com', explorer: 'https://bscscan.com/tx/' },
+      137: { name: 'Polygon', native: 'MATIC', rpc: 'https://polygon-bor.publicnode.com', explorer: 'https://polygonscan.com/tx/' }
+    };
+
+    // ===== APP STATE =====
     let state = {
       view: 'landing',
       wallet: null,
@@ -314,16 +348,27 @@
       error: ''
     };
 
+    // ===== RENDERING =====
     function render() {
       const app = document.getElementById('app');
       app.innerHTML = '';
 
       if (state.view === 'landing') {
-        if (hasWallet()) {
-          state.view = 'unlock';
-          render();
-          return;
+        // Stop inactivity timer on landing
+        stopInactivityListener();
+
+        let unlockSection = '';
+        if (hasSavedWallet()) {
+          unlockSection = `
+            <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(212,175,55,0.2);">
+              <p style="text-align:center; color:var(--gold); font-weight:600; margin-bottom:12px;">Wallet Password</p>
+              <input type="password" id="unlock-pwd" placeholder="Enter your wallet password" class="glow-on-focus" />
+              <button class="btn btn-primary" onclick="handleUnlock()" style="margin-top:8px;">Unlock Wallet</button>
+              ${state.error ? `<p style="color:#f87171; text-align:center; margin-top:8px;">${state.error}</p>` : ''}
+            </div>
+          `;
         }
+
         app.innerHTML = `
           <h1>KS1 Wallet</h1>
           <p class="disclaimer">Non-custodial • Open-source • Africa-built</p>
@@ -332,6 +377,7 @@
           </p>
           <button class="btn btn-primary" onclick="handleCreate()">Create New Wallet</button>
           <button class="btn btn-secondary" onclick="handleImport()">Import Wallet</button>
+          ${unlockSection}
           <div style="margin-top:24px; text-align:center; font-size:0.85rem; color:#64748b;">
             <span class="tooltip">?
               <span class="tooltiptext">KS1 Wallet is a free, open-source tool to learn and manage crypto safely.</span>
@@ -342,26 +388,9 @@
         return;
       }
 
-      if (state.view === 'unlock') {
-        const pwd = prompt('🔐 Enter your password to unlock your wallet:');
-        if (pwd) {
-          loadWallet(pwd).then(w => {
-            if (w) {
-              state.wallet = w;
-              state.address = w.address;
-              state.view = 'dashboard';
-              fetchBalance();
-            } else {
-              alert('❌ Incorrect password');
-              state.view = 'landing';
-            }
-            render();
-          });
-        } else {
-          state.view = 'landing';
-          render();
-        }
-        return;
+      // Start inactivity timer when entering dashboard or other secure views
+      if (['dashboard', 'send', 'receive', 'send-confirm'].includes(state.view)) {
+        startInactivityListener();
       }
 
       if (state.view === 'create') {
@@ -420,12 +449,10 @@
         return;
       }
 
-      // ✨ DASHBOARD — RESTRUCTURED LAYOUT ✨
       if (state.view === 'dashboard') {
         app.innerHTML = `
           <h2 class="dashboard-title">Dashboard</h2>
 
-          <!-- Network Selector -->
           <div style="margin: 20px 0;">
             <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">Network</label>
             <select id="chain-select" class="btn btn-secondary" style="width:100%; padding:12px; background:rgba(212,175,55,0.1); color:var(--gold); border:1px solid var(--gold);">
@@ -435,13 +462,11 @@
             </select>
           </div>
 
-          <!-- Balance BELOW Network -->
           <div style="margin: 20px 0; text-align:center;">
             <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">Balance</label>
             <div style="font-size:1.8rem; font-weight:700; color:var(--gold);">${state.balance} ${CHAINS[state.chainId].native}</div>
           </div>
 
-          <!-- Address Card -->
           <div style="background:rgba(30,41,59,0.7); border-radius:12px; padding:16px; margin:24px 0;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <code>${state.address.slice(0,6)}...${state.address.slice(-4)}</code>
@@ -449,7 +474,6 @@
             </div>
           </div>
 
-          <!-- Buttons -->
           <div class="flex">
             <button class="btn btn-primary" onclick="goSend()">Send</button>
             <button class="btn btn-receive" onclick="goReceive()">Receive</button>
@@ -539,12 +563,56 @@
     }
 
     // ===== ACTIONS =====
-    function goHome() { state.view = 'landing'; state.error = ''; render(); }
-    function goDashboard() { state.view = 'dashboard'; state.error = ''; render(); }
-    function goSend() { state.view = 'send'; state.error = ''; render(); }
-    function goReceive() { state.view = 'receive'; render(); }
+    function goHome() { 
+      state.view = 'landing'; 
+      state.error = ''; 
+      render(); 
+    }
+    
+    function goDashboard() { 
+      state.view = 'dashboard'; 
+      state.error = ''; 
+      render(); 
+    }
+    
+    function goSend() { 
+      state.view = 'send'; 
+      state.error = ''; 
+      render(); 
+    }
+    
+    function goReceive() { 
+      state.view = 'receive'; 
+      render(); 
+    }
 
-    function handleCreate() { state.view = 'create'; state.error = ''; render(); }
+    async function handleUnlock() {
+      const pwd = document.getElementById('unlock-pwd').value;
+      if (!pwd) {
+        state.error = 'Please enter your wallet password';
+        render();
+        return;
+      }
+      
+      const wallet = await loadWallet(pwd);
+      if (wallet) {
+        state.wallet = wallet;
+        state.address = wallet.address;
+        state.view = 'dashboard';
+        fetchBalance();
+        render();
+      } else {
+        state.error = 'Incorrect password. Please try again.';
+        render();
+      }
+    }
+
+    function handleCreate() { 
+      state.view = 'create'; 
+      state.error = ''; 
+      render(); 
+    }
+    
     async function handleCreateSubmit() {
       const pwd = document.getElementById('create-pwd').value;
       if (pwd.length < 8) {
@@ -582,7 +650,12 @@
       }
     }
 
-    function handleImport() { state.view = 'import'; state.error = ''; render(); }
+    function handleImport() { 
+      state.view = 'import'; 
+      state.error = ''; 
+      render(); 
+    }
+    
     async function handleImportSubmit() {
       const seed = document.getElementById('import-seed').value.trim();
       const pwd = document.getElementById('import-pwd').value;
@@ -659,6 +732,7 @@
       }
     }
 
+    // Expose to global scope
     window.handleCreate = handleCreate;
     window.handleImport = handleImport;
     window.goHome = goHome;
@@ -672,7 +746,9 @@
     window.handleSend = handleSend;
     window.handleSendConfirm = handleSendConfirm;
     window.copy = copy;
+    window.handleUnlock = handleUnlock;
 
+    // Initialize
     createWatermarks();
     render();
   </script>

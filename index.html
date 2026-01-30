@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>KS1 Wallet</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <style>
+    :root {
+      --red: #DC2626;
+      --gold: #D4AF37;
+      --black: #000000;
+      --gray-900: #111827;
+      --gray-800: #1F2937;
+      --gray-700: #374151;
+      --gray-400: #9CA3AF;
+      --yellow-400: #FBBF24;
+      --blue-400: #60A5FA;
+      --green-500: #10B981;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: var(--black);
+      color: white;
+      font-family: system-ui, sans-serif;
+      line-height: 1.5;
+      padding: 16px;
+      min-height: 100vh;
+    }
+    .container { max-width: 500px; margin: 0 auto; }
+    .btn {
+      display: block; width: 100%; padding: 12px; border: none; border-radius: 8px;
+      font-weight: 600; cursor: pointer; margin: 8px 0;
+    }
+    .btn-primary { background-color: var(--red); }
+    .btn-secondary { background-color: var(--gray-800); }
+    .btn:hover { opacity: 0.9; }
+    input, textarea, select {
+      width: 100%; padding: 12px; margin: 8px 0;
+      background: var(--gray-900); border: 1px solid var(--gray-700);
+      color: white; border-radius: 8px;
+    }
+    .card { background: var(--gray-900); padding: 16px; border-radius: 12px; margin: 16px 0; }
+    .flex { display: flex; gap: 8px; }
+    .center { text-align: center; }
+    .warning { background: rgba(251, 191, 36, 0.1); border: 1px solid var(--yellow-400); padding: 12px; border-radius: 8px; font-size: 0.875rem; }
+    .qr { text-align: center; margin: 20px 0; }
+    code { background: var(--gray-800); padding: 4px 8px; border-radius: 4px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="container" id="app">
+    <!-- Content will be rendered here by JS -->
+  </div>
+
+  <script>
+    // ===== CONFIG =====
+    const CHAINS = {
+      1: { name: 'Ethereum', native: 'ETH', rpc: 'https://ethereum.publicnode.com', explorer: 'https://etherscan.io/tx/' },
+      56: { name: 'BNB Chain', native: 'BNB', rpc: 'https://bsc.publicnode.com', explorer: 'https://bscscan.com/tx/' },
+      137: { name: 'Polygon', native: 'MATIC', rpc: 'https://polygon-bor.publicnode.com', explorer: 'https://polygonscan.com/tx/' }
+    };
+
+    const STORAGE_KEY = 'ks1_wallet_enc';
+
+    // ===== UTILS =====
+    function copy(text) {
+      navigator.clipboard.writeText(text).then(() => alert('Copied!'));
+    }
+
+    function generateQR(text) {
+      const qr = qrcode(0, 'M');
+      qr.addData(text);
+      qr.make();
+      return qr.createImgTag(5, 10);
+    }
+
+    // ===== WALLET STORAGE =====
+    function saveWallet(json) {
+      localStorage.setItem(STORAGE_KEY, json);
+    }
+
+    async function loadWallet(password) {
+      const json = localStorage.getItem(STORAGE_KEY);
+      if (!json) return null;
+      try {
+        return await ethers.Wallet.fromEncryptedJson(json, password);
+      } catch {
+        return null;
+      }
+    }
+
+    function hasWallet() {
+      return !!localStorage.getItem(STORAGE_KEY);
+    }
+
+    // ===== APP STATE =====
+    let state = {
+      view: 'landing',
+      wallet: null,
+      address: '',
+      balance: '...',
+      chainId: 1,
+      error: ''
+    };
+
+    // ===== RENDERING =====
+    function render() {
+      const app = document.getElementById('app');
+      app.innerHTML = '';
+
+      if (state.view === 'landing') {
+        if (hasWallet()) {
+          state.view = 'unlock';
+          render();
+          return;
+        }
+        app.innerHTML = `
+          <h1 class="text-3xl font-bold mb-4" style="color: var(--red);">KS1 Wallet</h1>
+          <p class="text-gray-400 mb-6 text-center">
+            Non-custodial, open-source wallet.<br/>
+            <span style="color: var(--yellow-400);">We never access your funds.</span>
+          </p>
+          <button class="btn btn-primary" onclick="handleCreate()">Create Wallet</button>
+          <button class="btn btn-secondary" onclick="handleImport()">Import Wallet</button>
+        `;
+        return;
+      }
+
+      if (state.view === 'unlock') {
+        const pwd = prompt('Enter your password to unlock:');
+        if (pwd) {
+          loadWallet(pwd).then(w => {
+            if (w) {
+              state.wallet = w;
+              state.address = w.address;
+              state.view = 'dashboard';
+              fetchBalance();
+            } else {
+              alert('Invalid password');
+              state.view = 'landing';
+            }
+            render();
+          });
+        } else {
+          state.view = 'landing';
+          render();
+        }
+        return;
+      }
+
+      if (state.view === 'create') {
+        app.innerHTML = `
+          <h2 class="text-2xl mb-4">Create Password</h2>
+          <p class="text-gray-400 mb-4">Use 8+ characters. Needed to unlock your wallet.</p>
+          <input type="password" id="create-pwd" placeholder="Password" />
+          ${state.error ? `<p style="color: var(--red);">${state.error}</p>` : ''}
+          <button class="btn btn-primary" onclick="handleCreateSubmit()">Continue</button>
+          <button class="btn btn-secondary" onclick="goHome()">Back</button>
+        `;
+        return;
+      }
+
+      if (state.view === 'show-mnemonic') {
+        app.innerHTML = `
+          <h2 class="text-2xl mb-4">Your Recovery Phrase</h2>
+          <p class="warning">⚠️ Write this down. Store it offline. Never share it.</p>
+          <div class="card" style="font-family: monospace; word-break: break-word;">${state.mnemonic}</div>
+          <button class="btn btn-primary" onclick="handleConfirmMnemonic()">I've saved it securely</button>
+        `;
+        return;
+      }
+
+      if (state.view === 'confirm-mnemonic') {
+        const words = state.mnemonic.split(' ');
+        app.innerHTML = `
+          <h2 class="text-2xl mb-4">Confirm Recovery Phrase</h2>
+          <p class="text-gray-400 mb-4">Enter word #3, #6, and #10</p>
+          <input id="word3" placeholder="Word #3" />
+          <input id="word6" placeholder="Word #6" />
+          <input id="word10" placeholder="Word #10" />
+          ${state.error ? `<p style="color: var(--red);">${state.error}</p>` : ''}
+          <button class="btn btn-primary" onclick="handleConfirmWords()">Confirm & Continue</button>
+        `;
+        return;
+      }
+
+      if (state.view === 'import') {
+        app.innerHTML = `
+          <h2 class="text-2xl mb-4">Import Wallet</h2>
+          <textarea id="import-seed" placeholder="Enter your 12-word recovery phrase" rows="3"></textarea>
+          <input type="password" id="import-pwd" placeholder="Set a password (8+ chars)" />
+          ${state.error ? `<p style="color: var(--red);">${state.error}</p>` : ''}
+          <button class="btn btn-primary" onclick="handleImportSubmit()">Import Wallet</button>
+          <button class="btn btn-secondary" onclick="goHome()">Back</button>
+        `;
+        return;
+      }
+
+      if (state.view === 'dashboard') {
+        app.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <h1 class="text-2xl font-bold" style="color: var(--red);">KS1 Wallet</h1>
+            <select id="chain-select" class="btn btn-secondary" style="width: auto;">
+              <option value="1">Ethereum</option>
+              <option value="56">BNB Chain</option>
+              <option value="137">Polygon</option>
+            </select>
+          </div>
+
+          <div class="card">
+            <div class="flex" style="justify-content: space-between;">
+              <code>${state.address.slice(0,6)}...${state.address.slice(-4)}</code>
+              <button onclick="copy('${state.address}')">📋</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <p>Balance: ${state.balance} ${CHAINS[state.chainId].native}</p>
+          </div>
+
+          <div class="flex">
+            <button class="btn btn-primary" onclick="goSend()">Send</button>
+            <button class="btn btn-secondary" onclick="goReceive()">Receive</button>
+          </div>
+        `;
+        document.getElementById('chain-select').value = state.chainId;
+        document.getElementById('chain-select').onchange = (e) => {
+          state.chainId = Number(e.target.value);
+          fetchBalance();
+          render();
+        };
+        return;
+      }
+
+      if (state.view === 'send') {
+        app.innerHTML = `
+          <h2 class="text-2xl mb-4">Send</h2>
+          <select id="send-chain" class="btn btn-secondary" style="margin-bottom: 12px;">
+            <option value="1">Ethereum</option>
+            <option value="56">BNB Chain</option>
+            <option value="137">Polygon</option>
+          </select>
+          <input id="send-to" placeholder="Recipient address" />
+          <input id="send-amount" placeholder="Amount (${CHAINS[state.chainId].native})" type="number" step="0.0001" />
+          ${state.error ? `<p style="color: var(--red);">${state.error}</p>` : ''}
+          <button class="btn btn-primary" onclick="handleSend()">Send</button>
+          <button class="btn btn-secondary" onclick="goDashboard()">Back</button>
+        `;
+        document.getElementById('send-chain').value = state.chainId;
+        document.getElementById('send-chain').onchange = (e) => {
+          state.chainId = Number(e.target.value);
+          render();
+        };
+        return;
+      }
+
+      if (state.view === 'send-confirm') {
+        app.innerHTML = `
+          <h2 class="text-2xl mb-4">Confirm Transaction</h2>
+          <p>Sending ${state.sendAmount} ${CHAINS[state.chainId].native}</p>
+          <p>To: ${state.sendTo}</p>
+          <p>Network: ${CHAINS[state.chainId].name}</p>
+          <input type="password" id="send-pwd" placeholder="Enter password" style="margin: 16px 0;" />
+          <button class="btn btn-primary" onclick="handleSendConfirm()">Confirm & Send</button>
+          <button class="btn btn-secondary" onclick="goSend()">Cancel</button>
+        `;
+        return;
+      }
+
+      if (state.view === 'send-success') {
+        const url = CHAINS[state.chainId].explorer + state.txHash;
+        app.innerHTML = `
+          <h2 class="text-2xl mb-4" style="color: var(--green-500);">Sent!</h2>
+          <p>Transaction confirmed.</p>
+          <a href="${url}" target="_blank" class="btn btn-secondary" style="margin-top: 16px;">View on Explorer</a>
+          <button class="btn btn-primary" onclick="goDashboard()" style="margin-top: 16px;">Back to Dashboard</button>
+        `;
+        return;
+      }
+
+      if (state.view === 'receive') {
+        const qrHtml = generateQR(state.address);
+        app.innerHTML = `
+          <h2 class="text-2xl mb-4">Receive</h2>
+          <div class="qr">${qrHtml}</div>
+          <div class="flex" style="justify-content: center; margin: 16px 0;">
+            <code>${state.address.slice(0,6)}...${state.address.slice(-4)}</code>
+            <button onclick="copy('${state.address}')">📋</button>
+          </div>
+          <p class="warning">Only send ${CHAINS[state.chainId].native} on ${CHAINS[state.chainId].name}</p>
+          <button class="btn btn-secondary" onclick="goDashboard()">Back</button>
+        `;
+        return;
+      }
+    }
+
+    // ===== ACTIONS =====
+    function goHome() { state.view = 'landing'; state.error = ''; render(); }
+    function goDashboard() { state.view = 'dashboard'; state.error = ''; render(); }
+    function goSend() { state.view = 'send'; state.error = ''; render(); }
+    function goReceive() { state.view = 'receive'; render(); }
+
+    function handleCreate() { state.view = 'create'; state.error = ''; render(); }
+    async function handleCreateSubmit() {
+      const pwd = document.getElementById('create-pwd').value;
+      if (pwd.length < 8) {
+        state.error = 'Password must be at least 8 characters';
+        render();
+        return;
+      }
+      const wallet = ethers.Wallet.createRandom();
+      const mnemonic = wallet.mnemonic.phrase;
+      await wallet.encrypt(pwd).then(json => saveWallet(json));
+      state.mnemonic = mnemonic;
+      state.view = 'show-mnemonic';
+      render();
+    }
+
+    function handleConfirmMnemonic() {
+      state.view = 'confirm-mnemonic';
+      render();
+    }
+
+    function handleConfirmWords() {
+      const words = state.mnemonic.split(' ');
+      const w3 = document.getElementById('word3').value.trim().toLowerCase();
+      const w6 = document.getElementById('word6').value.trim().toLowerCase();
+      const w10 = document.getElementById('word10').value.trim().toLowerCase();
+      if (w3 === words[2] && w6 === words[5] && w10 === words[9]) {
+        state.view = 'dashboard';
+        state.wallet = ethers.Wallet.fromPhrase(state.mnemonic);
+        state.address = state.wallet.address;
+        fetchBalance();
+        render();
+      } else {
+        state.error = 'Incorrect words. Try again.';
+        render();
+      }
+    }
+
+    function handleImport() { state.view = 'import'; state.error = ''; render(); }
+    async function handleImportSubmit() {
+      const seed = document.getElementById('import-seed').value.trim();
+      const pwd = document.getElementById('import-pwd').value;
+      if (pwd.length < 8) {
+        state.error = 'Password must be 8+ characters';
+        render();
+        return;
+      }
+      try {
+        const wallet = ethers.Wallet.fromPhrase(seed);
+        await wallet.encrypt(pwd).then(json => saveWallet(json));
+        state.wallet = wallet;
+        state.address = wallet.address;
+        state.view = 'dashboard';
+        fetchBalance();
+        render();
+      } catch {
+        state.error = 'Invalid seed phrase';
+        render();
+      }
+    }
+
+    async function fetchBalance() {
+      state.balance = '...';
+      render();
+      const provider = new ethers.JsonRpcProvider(CHAINS[state.chainId].rpc);
+      const bal = await provider.getBalance(state.address);
+      state.balance = parseFloat(ethers.formatEther(bal)).toFixed(4);
+      render();
+    }
+
+    async function handleSend() {
+      const to = document.getElementById('send-to').value;
+      const amount = document.getElementById('send-amount').value;
+      const chainId = Number(document.getElementById('send-chain').value);
+      if (!ethers.isAddress(to)) {
+        state.error = 'Invalid recipient address';
+        render();
+        return;
+      }
+      if (!amount || parseFloat(amount) <= 0) {
+        state.error = 'Enter a valid amount';
+        render();
+        return;
+      }
+      state.sendTo = to;
+      state.sendAmount = amount;
+      state.chainId = chainId;
+      state.view = 'send-confirm';
+      render();
+    }
+
+    async function handleSendConfirm() {
+      const pwd = document.getElementById('send-pwd').value;
+      const wallet = await loadWallet(pwd);
+      if (!wallet) {
+        alert('Invalid password');
+        return;
+      }
+      try {
+        const provider = new ethers.JsonRpcProvider(CHAINS[state.chainId].rpc);
+        const signer = wallet.connect(provider);
+        const tx = await signer.sendTransaction({
+          to: state.sendTo,
+          value: ethers.parseEther(state.sendAmount)
+        });
+        await tx.wait();
+        state.txHash = tx.hash;
+        state.view = 'send-success';
+        render();
+      } catch (err) {
+        alert('Transaction failed: ' + err.message);
+        goSend();
+      }
+    }
+
+    // ===== START APP =====
+    window.handleCreate = handleCreate;
+    window.handleImport = handleImport;
+    window.goHome = goHome;
+    window.goDashboard = goDashboard;
+    window.goSend = goSend;
+    window.goReceive = goReceive;
+    window.handleCreateSubmit = handleCreateSubmit;
+    window.handleConfirmMnemonic = handleConfirmMnemonic;
+    window.handleConfirmWords = handleConfirmWords;
+    window.handleImportSubmit = handleImportSubmit;
+    window.handleSend = handleSend;
+    window.handleSendConfirm = handleSendConfirm;
+    window.copy = copy;
+
+    render();
+  </script>
+</body>
+</html>

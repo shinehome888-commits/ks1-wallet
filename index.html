@@ -4,7 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>KS1 Wallet</title>
+  <!-- EVM Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
+  <!-- Bitcoin Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@noble/hashes@1.5.0/esm/sha256.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scure/bip39@1.3.0/browser/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scure/bip32@1.4.0/browser/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <style>
     :root {
@@ -238,6 +243,17 @@
     .glow-on-focus:focus {
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.6), 0 0 15px rgba(37, 99, 235, 0.4);
     }
+
+    /* Bitcoin education banner */
+    .bitcoin-education {
+      background: rgba(37, 99, 235, 0.15);
+      border: 1px solid var(--blue);
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 20px;
+      font-size: 0.85rem;
+      color: #bfdbfe;
+    }
   </style>
 </head>
 <body>
@@ -250,7 +266,7 @@
   <script>
     // ===== AUTO-LOGOUT SYSTEM =====
     let inactivityTimer;
-    const INACTIVITY_TIMEOUT = 60 * 1000; // 1 minute ← UPDATED FROM 10 MINUTES
+    const INACTIVITY_TIMEOUT = 60 * 1000; // 1 minute
 
     function resetInactivityTimer() {
       clearTimeout(inactivityTimer);
@@ -278,10 +294,9 @@
       state.view = 'landing';
       render();
       stopInactivityListener();
-      console.log('Auto-logout due to inactivity');
     }
 
-    // ===== WALLET STORAGE =====
+    // ===== STORAGE =====
     const STORAGE_KEY = 'ks1_wallet_enc';
 
     function saveWallet(json) {
@@ -300,6 +315,104 @@
 
     function hasSavedWallet() {
       return !!localStorage.getItem(STORAGE_KEY);
+    }
+
+    // ===== BITCOIN SUPPORT =====
+    async function createBitcoinWallet() {
+      const mnemonic = bip39.generateMnemonic(bip39.wordlists.english, 128);
+      const seed = bip39.mnemonicToSeedSync(mnemonic);
+      const master = bip32.HDKey.fromMasterSeed(seed);
+      const child = master.derive("m/84'/0'/0'/0/0");
+      
+      // Get compressed public key
+      const pubKey = child.publicKey;
+      if (!pubKey) throw new Error('No public key');
+      
+      // SHA256 hash
+      const hash = nobleHashes.sha256.create().update(pubKey).digest();
+      
+      // Bech32 encode
+      const address = bech32Encode('bc', 0, hash);
+      return { mnemonic, address };
+    }
+
+    function deriveBitcoinAddressFromMnemonic(mnemonic) {
+      const seed = bip39.mnemonicToSeedSync(mnemonic);
+      const master = bip32.HDKey.fromMasterSeed(seed);
+      const child = master.derive("m/84'/0'/0'/0/0");
+      const pubKey = child.publicKey;
+      if (!pubKey) throw new Error('No public key');
+      const hash = nobleHashes.sha256.create().update(pubKey).digest();
+      return bech32Encode('bc', 0, hash);
+    }
+
+    function isValidBitcoinAddress(addr) {
+      return /^bc1[ac-hj-np-z02-9]{39,59}$/.test(addr);
+    }
+
+    async function getBitcoinBalance(address) {
+      try {
+        const res = await fetch(`https://api.blockcypher.com/v1/btc/main/addrs/${address}/balance`);
+        const data = await res.json();
+        return (data.balance || 0) / 100000000; // satoshis → BTC
+      } catch {
+        return 0;
+      }
+    }
+
+    function sendBitcoinURI(recipient, amountBTC) {
+      return `bitcoin:${recipient}?amount=${amountBTC}`;
+    }
+
+    // Bech32 encoder (simplified for native segwit)
+    function bech32Encode(hrp, version, program) {
+      const CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+      const expanded = new Uint8Array(program.length * 2);
+      for (let i = 0; i < program.length; i++) {
+        expanded[i * 2] = program[i] >> 5;
+        expanded[i * 2 + 1] = program[i] & 31;
+      }
+      
+      let value = version;
+      for (const byte of expanded) {
+        value = (value << 5) ^ byte;
+      }
+      
+      let checksum = 1;
+      for (let i = 0; i < hrp.length; i++) {
+        checksum = polymod(checksum, hrp.charCodeAt(i) >> 5);
+        checksum = polymod(checksum, hrp.charCodeAt(i) & 31);
+      }
+      checksum = polymod(checksum, 0);
+      for (const p of [version, ...program]) {
+        checksum = polymod(checksum, p);
+      }
+      for (let i = 0; i < 6; i++) {
+        checksum = polymod(checksum, 0);
+      }
+      checksum ^= 1;
+      
+      const combined = [version, ...program, 
+        (checksum >> 30) & 31,
+        (checksum >> 25) & 31,
+        (checksum >> 20) & 31,
+        (checksum >> 15) & 31,
+        (checksum >> 10) & 31,
+        (checksum >> 5) & 31,
+        checksum & 31
+      ];
+      
+      return hrp + '1' + combined.map(v => CHARSET[v]).join('');
+    }
+
+    function polymod(value, v) {
+      const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+      const topBits = value >> 25;
+      value = ((value & 0x1ffffff) << 5) ^ v;
+      for (let i = 0; i < 5; i++) {
+        if ((topBits >> i) & 1) value ^= GEN[i];
+      }
+      return value;
     }
 
     // ===== UTILS =====
@@ -343,8 +456,9 @@
       wallet: null,
       address: '',
       balance: '...',
-      chainId: 1,
-      error: ''
+      chainId: 1, // 1=ETH, 56=BNB, 137=Polygon, 'btc'=Bitcoin
+      error: '',
+      isBitcoin: false
     };
 
     // ===== RENDERING =====
@@ -374,7 +488,7 @@
             Your keys, your crypto. We never access your funds.
           </p>
           <button class="btn btn-primary" onclick="handleCreate()">Create New Wallet</button>
-          <button class="btn btn-primary" onclick="handleImport()">Import Wallet</button> <!-- ← NOW BLUE -->
+          <button class="btn btn-primary" onclick="handleImport()">Import Wallet</button>
           ${unlockSection}
           <div style="margin-top:24px; text-align:center; font-size:0.85rem; color:#64748b;">
             <span class="tooltip">?
@@ -394,6 +508,10 @@
         app.innerHTML = `
           <h2>Create Wallet</h2>
           <p>Set a strong password (8+ characters). You’ll need it to access your wallet.</p>
+          <select id="create-network" class="btn btn-secondary" style="margin-bottom:12px;">
+            <option value="evm">Ethereum / BNB / Polygon</option>
+            <option value="bitcoin">Bitcoin (BTC)</option>
+          </select>
           <input type="password" id="create-pwd" placeholder="Password" class="glow-on-focus" />
           ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
           <button class="btn btn-primary" onclick="handleCreateSubmit()">Continue</button>
@@ -437,6 +555,10 @@
       if (state.view === 'import') {
         app.innerHTML = `
           <h2>Import Wallet</h2>
+          <select id="import-network" class="btn btn-secondary" style="margin-bottom:12px;">
+            <option value="evm">Ethereum / BNB / Polygon</option>
+            <option value="bitcoin">Bitcoin (BTC)</option>
+          </select>
           <textarea id="import-seed" placeholder="Paste your 12-word recovery phrase" rows="3" class="glow-on-focus"></textarea>
           <input type="password" id="import-pwd" placeholder="Set a new password (8+ chars)" class="glow-on-focus" />
           ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
@@ -447,21 +569,32 @@
       }
 
       if (state.view === 'dashboard') {
+        const isBitcoin = state.chainId === 'btc';
+        const networkName = isBitcoin ? 'Bitcoin (BTC)' : CHAINS[state.chainId].name;
+        const balanceDisplay = isBitcoin ? `${state.balance} BTC` : `${state.balance} ${CHAINS[state.chainId].native}`;
+
+        let networkSelector = '';
+        if (!isBitcoin) {
+          networkSelector = `
+            <div style="margin: 20px 0;">
+              <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">Network</label>
+              <select id="chain-select" class="btn btn-secondary" style="width:100%; padding:12px; background:rgba(212,175,55,0.1); color:var(--gold); border:1px solid var(--gold);">
+                <option value="1">Ethereum</option>
+                <option value="56">BNB Chain</option>
+                <option value="137">Polygon</option>
+              </select>
+            </div>
+          `;
+        }
+
         app.innerHTML = `
           <h2 class="dashboard-title">Dashboard</h2>
 
-          <div style="margin: 20px 0;">
-            <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">Network</label>
-            <select id="chain-select" class="btn btn-secondary" style="width:100%; padding:12px; background:rgba(212,175,55,0.1); color:var(--gold); border:1px solid var(--gold);">
-              <option value="1">Ethereum</option>
-              <option value="56">BNB Chain</option>
-              <option value="137">Polygon</option>
-            </select>
-          </div>
+          ${networkSelector}
 
           <div style="margin: 20px 0; text-align:center;">
-            <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">Balance</label>
-            <div style="font-size:1.8rem; font-weight:700; color:var(--gold);">${state.balance} ${CHAINS[state.chainId].native}</div>
+            <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">${networkName}</label>
+            <div style="font-size:1.8rem; font-weight:700; color:var(--gold);">${balanceDisplay}</div>
           </div>
 
           <div style="background:rgba(30,41,59,0.7); border-radius:12px; padding:16px; margin:24px 0;">
@@ -476,51 +609,77 @@
             <button class="btn btn-receive" onclick="goReceive()">Receive</button>
           </div>
 
-          <div style="margin-top:24px; text-align:center; font-size:0.85rem; color:#64748b;">
-            <span class="tooltip">💡
-              <span class="tooltiptext">Gas is the fee paid to miners. Higher gas = faster transaction.</span>
-            </span>
-            Why do I pay gas fees?
-          </div>
+          ${isBitcoin ? `
+            <div class="bitcoin-education">
+              💡 Bitcoin is a different network from Ethereum.<br/>
+              💡 BTC transactions don't use gas like Ethereum.<br/>
+              💡 Transactions may take 10-60 minutes to confirm.
+            </div>
+          ` : `
+            <div style="margin-top:24px; text-align:center; font-size:0.85rem; color:#64748b;">
+              <span class="tooltip">💡
+                <span class="tooltiptext">Gas is the fee paid to miners. Higher gas = faster transaction.</span>
+              </span>
+              Why do I pay gas fees?
+            </div>
+          `}
         `;
-        document.getElementById('chain-select').value = state.chainId;
-        document.getElementById('chain-select').onchange = (e) => {
-          state.chainId = Number(e.target.value);
-          fetchBalance();
-          render();
-        };
+
+        if (!isBitcoin) {
+          document.getElementById('chain-select').value = state.chainId;
+          document.getElementById('chain-select').onchange = (e) => {
+            state.chainId = Number(e.target.value);
+            fetchBalance();
+            render();
+          };
+        }
         return;
       }
 
       if (state.view === 'send') {
+        const isBitcoin = state.chainId === 'btc';
+        let networkSelect = '';
+        if (!isBitcoin) {
+          networkSelect = `
+            <select id="send-chain" class="btn btn-secondary" style="margin-bottom:12px; padding:8px 16px; background:rgba(212,175,55,0.1); color:var(--gold);">
+              <option value="1">Ethereum (ETH)</option>
+              <option value="56">BNB Chain (BNB)</option>
+              <option value="137">Polygon (MATIC)</option>
+            </select>
+          `;
+        }
+
         app.innerHTML = `
           <h2>Send Crypto</h2>
-          <select id="send-chain" class="btn btn-secondary" style="margin-bottom:12px; padding:8px 16px; background:rgba(212,175,55,0.1); color:var(--gold);">
-            <option value="1">Ethereum (ETH)</option>
-            <option value="56">BNB Chain (BNB)</option>
-            <option value="137">Polygon (MATIC)</option>
-          </select>
-          <input id="send-to" placeholder="Recipient address (0x...)" class="glow-on-focus" />
+          ${networkSelect}
+          <input id="send-to" placeholder="${isBitcoin ? 'Bitcoin address (bc1...)' : 'Recipient address (0x...)'}" class="glow-on-focus" />
           <input id="send-amount" placeholder="Amount" type="number" step="0.0001" class="glow-on-focus" />
           ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
           <button class="btn btn-primary" onclick="handleSend()">Preview Transaction</button>
           <button class="btn btn-secondary" onclick="goDashboard()">Cancel</button>
         `;
-        document.getElementById('send-chain').value = state.chainId;
-        document.getElementById('send-chain').onchange = (e) => {
-          state.chainId = Number(e.target.value);
-          render();
-        };
+
+        if (!isBitcoin) {
+          document.getElementById('send-chain').value = state.chainId;
+          document.getElementById('send-chain').onchange = (e) => {
+            state.chainId = Number(e.target.value);
+            render();
+          };
+        }
         return;
       }
 
       if (state.view === 'send-confirm') {
+        const isBitcoin = state.chainId === 'btc';
+        const networkName = isBitcoin ? 'Bitcoin' : CHAINS[state.chainId].name;
+        const amountDisplay = isBitcoin ? `${state.sendAmount} BTC` : `${state.sendAmount} ${CHAINS[state.chainId].native}`;
+
         app.innerHTML = `
           <h2>Confirm Send</h2>
           <div style="background:rgba(30,41,59,0.7); padding:16px; border-radius:12px; margin:16px 0;">
-            <p><strong>Amount:</strong> ${state.sendAmount} ${CHAINS[state.chainId].native}</p>
+            <p><strong>Amount:</strong> ${amountDisplay}</p>
             <p><strong>To:</strong> ${state.sendTo.slice(0,10)}...${state.sendTo.slice(-4)}</p>
-            <p><strong>Network:</strong> ${CHAINS[state.chainId].name}</p>
+            <p><strong>Network:</strong> ${networkName}</p>
           </div>
           <input type="password" id="send-pwd" placeholder="Enter password to sign" class="glow-on-focus" style="margin:16px 0;" />
           <button class="btn btn-primary" onclick="handleSendConfirm()">Confirm & Send</button>
@@ -530,11 +689,17 @@
       }
 
       if (state.view === 'send-success') {
-        const url = CHAINS[state.chainId].explorer + state.txHash;
+        const isBitcoin = state.chainId === 'btc';
+        let explorerLink = '';
+        if (!isBitcoin) {
+          const url = CHAINS[state.chainId].explorer + state.txHash;
+          explorerLink = `<a href="${url}" target="_blank" class="btn btn-secondary" style="display:inline-block; width:auto; padding:12px 24px;">View on Explorer</a>`;
+        }
+
         app.innerHTML = `
           <h2 style="color:#10b981;">✅ Sent Successfully!</h2>
           <p style="text-align:center; margin:20px 0;">Your transaction is confirmed.</p>
-          <a href="${url}" target="_blank" class="btn btn-secondary" style="display:inline-block; width:auto; padding:12px 24px;">View on Explorer</a>
+          ${explorerLink}
           <button class="btn btn-primary" onclick="goDashboard()" style="margin-top:16px;">Back to Wallet</button>
         `;
         return;
@@ -542,6 +707,11 @@
 
       if (state.view === 'receive') {
         const qrHtml = generateQR(state.address);
+        const isBitcoin = state.chainId === 'btc';
+        const warningText = isBitcoin 
+          ? `⚠️ Only send <strong>BTC</strong> to this address. Sending other coins may result in permanent loss.`
+          : `⚠️ Only send <strong>${CHAINS[state.chainId].native}</strong> on <strong>${CHAINS[state.chainId].name}</strong>.`;
+
         app.innerHTML = `
           <h2>Receive Crypto</h2>
           <div class="qr">${qrHtml}</div>
@@ -549,10 +719,7 @@
             <code>${state.address}</code>
             <button onclick="copy('${state.address}')" style="background:none; border:none; color:var(--gold); margin-left:10px;">📋</button>
           </div>
-          <div class="warning">
-            ⚠️ Only send <strong>${CHAINS[state.chainId].native}</strong> on <strong>${CHAINS[state.chainId].name}</strong>.
-            Sending other tokens may result in permanent loss.
-          </div>
+          <div class="warning">${warningText}</div>
           <button class="btn btn-primary" onclick="goDashboard()">Back</button>
         `;
         return;
@@ -595,6 +762,8 @@
       if (wallet) {
         state.wallet = wallet;
         state.address = wallet.address;
+        state.isBitcoin = false;
+        state.chainId = 1;
         state.view = 'dashboard';
         fetchBalance();
         render();
@@ -612,17 +781,37 @@
     
     async function handleCreateSubmit() {
       const pwd = document.getElementById('create-pwd').value;
+      const network = document.getElementById('create-network').value;
+      
       if (pwd.length < 8) {
         state.error = 'Password must be at least 8 characters';
         render();
         return;
       }
-      const wallet = ethers.Wallet.createRandom();
-      const mnemonic = wallet.mnemonic.phrase;
-      await wallet.encrypt(pwd).then(json => saveWallet(json));
-      state.mnemonic = mnemonic;
-      state.view = 'show-mnemonic';
-      render();
+
+      if (network === 'bitcoin') {
+        try {
+          const { mnemonic, address } = await createBitcoinWallet();
+          // For Phase 1, we don't store Bitcoin mnemonics encrypted
+          // User must save it manually (like MetaMask)
+          state.mnemonic = mnemonic;
+          state.address = address;
+          state.chainId = 'btc';
+          state.isBitcoin = true;
+          state.view = 'show-mnemonic';
+          render();
+        } catch (err) {
+          state.error = 'Failed to create Bitcoin wallet';
+          render();
+        }
+      } else {
+        const wallet = ethers.Wallet.createRandom();
+        const mnemonic = wallet.mnemonic.phrase;
+        await wallet.encrypt(pwd).then(json => saveWallet(json));
+        state.mnemonic = mnemonic;
+        state.view = 'show-mnemonic';
+        render();
+      }
     }
 
     function handleConfirmMnemonic() {
@@ -636,11 +825,17 @@
       const w6 = document.getElementById('word6').value.trim().toLowerCase();
       const w10 = document.getElementById('word10').value.trim().toLowerCase();
       if (w3 === words[2] && w6 === words[5] && w10 === words[9]) {
-        state.view = 'dashboard';
-        state.wallet = ethers.Wallet.fromPhrase(state.mnemonic);
-        state.address = state.wallet.address;
-        fetchBalance();
-        render();
+        if (state.chainId === 'btc') {
+          state.view = 'dashboard';
+          fetchBalance();
+          render();
+        } else {
+          state.view = 'dashboard';
+          state.wallet = ethers.Wallet.fromPhrase(state.mnemonic);
+          state.address = state.wallet.address;
+          fetchBalance();
+          render();
+        }
       } else {
         state.error = 'Incorrect words. Try again.';
         render();
@@ -656,79 +851,130 @@
     async function handleImportSubmit() {
       const seed = document.getElementById('import-seed').value.trim();
       const pwd = document.getElementById('import-pwd').value;
+      const network = document.getElementById('import-network').value;
+      
       if (pwd.length < 8) {
         state.error = 'Password must be 8+ characters';
         render();
         return;
       }
-      try {
-        const wallet = ethers.Wallet.fromPhrase(seed);
-        await wallet.encrypt(pwd).then(json => saveWallet(json));
-        state.wallet = wallet;
-        state.address = wallet.address;
-        state.view = 'dashboard';
-        fetchBalance();
-        render();
-      } catch {
-        state.error = 'Invalid seed phrase';
-        render();
+
+      if (network === 'bitcoin') {
+        try {
+          if (!bip39.validateMnemonic(seed, bip39.wordlists.english)) {
+            throw new Error('Invalid');
+          }
+          const address = deriveBitcoinAddressFromMnemonic(seed);
+          state.address = address;
+          state.chainId = 'btc';
+          state.isBitcoin = true;
+          state.view = 'dashboard';
+          fetchBalance();
+          render();
+        } catch {
+          state.error = 'Invalid Bitcoin seed phrase';
+          render();
+        }
+      } else {
+        try {
+          const wallet = ethers.Wallet.fromPhrase(seed);
+          await wallet.encrypt(pwd).then(json => saveWallet(json));
+          state.wallet = wallet;
+          state.address = wallet.address;
+          state.view = 'dashboard';
+          fetchBalance();
+          render();
+        } catch {
+          state.error = 'Invalid seed phrase';
+          render();
+        }
       }
     }
 
     async function fetchBalance() {
       state.balance = 'Loading...';
       render();
-      const provider = new ethers.JsonRpcProvider(CHAINS[state.chainId].rpc);
-      const bal = await provider.getBalance(state.address);
-      state.balance = parseFloat(ethers.formatEther(bal)).toFixed(4);
+      
+      if (state.chainId === 'btc') {
+        const bal = await getBitcoinBalance(state.address);
+        state.balance = bal.toFixed(8);
+      } else {
+        const provider = new ethers.JsonRpcProvider(CHAINS[state.chainId].rpc);
+        const bal = await provider.getBalance(state.address);
+        state.balance = parseFloat(ethers.formatEther(bal)).toFixed(4);
+      }
       render();
     }
 
     async function handleSend() {
       const to = document.getElementById('send-to').value;
       const amount = document.getElementById('send-amount').value;
-      const chainId = Number(document.getElementById('send-chain').value);
-      if (!ethers.isAddress(to)) {
-        state.error = 'Invalid Ethereum address';
-        render();
-        return;
+      const isBitcoin = state.chainId === 'btc';
+      
+      if (isBitcoin) {
+        if (!isValidBitcoinAddress(to)) {
+          state.error = 'Invalid Bitcoin address (must start with bc1)';
+          render();
+          return;
+        }
+      } else {
+        if (!ethers.isAddress(to)) {
+          state.error = 'Invalid Ethereum address';
+          render();
+          return;
+        }
       }
+      
       if (!amount || parseFloat(amount) <= 0) {
         state.error = 'Enter a valid amount';
         render();
         return;
       }
+      
       state.sendTo = to;
       state.sendAmount = amount;
-      state.chainId = chainId;
       state.view = 'send-confirm';
       render();
     }
 
     async function handleSendConfirm() {
       const pwd = document.getElementById('send-pwd').value;
-      const wallet = await loadWallet(pwd);
-      if (!wallet) {
-        alert('❌ Invalid password');
-        return;
-      }
-      try {
-        const provider = new ethers.JsonRpcProvider(CHAINS[state.chainId].rpc);
-        const signer = wallet.connect(provider);
-        const tx = await signer.sendTransaction({
-          to: state.sendTo,
-          value: ethers.parseEther(state.sendAmount)
-        });
-        await tx.wait();
-        state.txHash = tx.hash;
-        state.view = 'send-success';
-        render();
-      } catch (err) {
-        alert('Transaction failed: ' + (err.reason || err.message));
-        goSend();
+      const isBitcoin = state.chainId === 'btc';
+      
+      if (isBitcoin) {
+        // Open bitcoin: URI in external wallet
+        const uri = sendBitcoinURI(state.sendTo, state.sendAmount);
+        window.location.href = uri;
+        // After sending, return to dashboard
+        setTimeout(() => {
+          state.view = 'send-success';
+          render();
+        }, 1000);
+      } else {
+        const wallet = await loadWallet(pwd);
+        if (!wallet) {
+          alert('❌ Invalid password');
+          return;
+        }
+        try {
+          const provider = new ethers.JsonRpcProvider(CHAINS[state.chainId].rpc);
+          const signer = wallet.connect(provider);
+          const tx = await signer.sendTransaction({
+            to: state.sendTo,
+            value: ethers.parseEther(state.sendAmount)
+          });
+          await tx.wait();
+          state.txHash = tx.hash;
+          state.view = 'send-success';
+          render();
+        } catch (err) {
+          alert('Transaction failed: ' + (err.reason || err.message));
+          goSend();
+        }
       }
     }
 
+    // Expose to global scope
     window.handleCreate = handleCreate;
     window.handleImport = handleImport;
     window.goHome = goHome;
@@ -744,6 +990,7 @@
     window.copy = copy;
     window.handleUnlock = handleUnlock;
 
+    // Initialize
     createWatermarks();
     render();
   </script>

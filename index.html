@@ -325,11 +325,11 @@
       // Clear any existing interval
       if (learningInterval) clearInterval(learningInterval);
       
-      // Rotate every 2 minutes (120,000 ms)
+      // Rotate every 45 seconds (45,000 ms)
       learningInterval = setInterval(() => {
         currentLearningIndex = (currentLearningIndex + 1) % LEARNING_UNITS.length;
         render(); // Re-render to show new tip
-      }, 120000);
+      }, 45000);
     }
 
     function stopLearningRotation() {

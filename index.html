@@ -258,6 +258,59 @@ color: var(--gold);
 cursor: pointer;
 font-size: 1.2rem;
 }
+
+/* ===== NEW: BALANCE TOGGLE & USD VALUE ===== */
+.balance-section {
+text-align: center;
+margin: 24px 0;
+}
+.balance-display {
+font-size: 2.2rem;
+font-weight: 800;
+color: var(--gold);
+letter-spacing: -0.5px;
+margin: 12px 0;
+}
+.usd-value {
+color: #94a3b8;
+font-size: 0.95rem;
+margin-top: 4px;
+}
+.toggle-balance {
+background: none;
+border: none;
+color: var(--gold);
+font-size: 1.4rem;
+cursor: pointer;
+margin-left: 8px;
+vertical-align: middle;
+}
+.address-card {
+background: rgba(30, 41, 59, 0.7);
+border-radius: 16px;
+padding: 18px;
+margin: 20px 0;
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+.address-code {
+font-family: monospace;
+font-size: 1.05rem;
+word-break: break-all;
+}
+.copy-btn {
+background: rgba(212, 175, 55, 0.2);
+border: 1px solid rgba(212, 175, 55, 0.4);
+border-radius: 8px;
+padding: 6px 12px;
+color: var(--gold);
+cursor: pointer;
+font-size: 1rem;
+}
+.copy-btn:hover {
+background: rgba(212, 175, 55, 0.3);
+}
 </style>
 </head>
 <body>
@@ -268,6 +321,17 @@ font-size: 1.2rem;
 <!-- Professional Footer -->
 <div class="footer">© 2026 KS1 Wallet — A nonprofit project by KS1 Empire Group & Foundation {KS1EGF}</div>
 <script>
+// ===== PRICE FETCHING (NEW) =====
+async function fetchCryptoPrice(symbol) {
+  try {
+    const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${symbol}&vs_currencies=usd`);
+    const data = await res.json();
+    return data[symbol]?.usd || 0;
+  } catch {
+    return 0;
+  }
+}
+
 // ===== BITCOIN WALLET CREATION (WORKING FIX) =====
 function createBitcoinWallet() {
 const mnemonic = bip39.generateMnemonic(128);
@@ -502,157 +566,6 @@ return null;
 function hasSavedWallet() {
 return !!localStorage.getItem(STORAGE_KEY);
 }
-
-// ===== BIOMETRIC UNLOCK SERVICE (ADDITIVE ONLY) =====
-let biometricEnabled = localStorage.getItem('ks1_biometric_enabled') === 'true';
-
-// Check if WebAuthn is supported
-function isBiometricSupported() {
-  return window.PublicKeyCredential && 
-         PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable;
-}
-
-// Register biometric credential during wallet creation/import
-async function registerBiometricCredential(password) {
-  if (!isBiometricSupported()) return false;
-  
-  try {
-    const challenge = new Uint8Array(32);
-    window.crypto.getRandomValues(challenge);
-    
-    const credential = await navigator.credentials.create({
-      publicKey: {
-        challenge,
-        rp: { name: "KS1 Wallet" },
-        user: {
-          id: new TextEncoder().encode('ks1_user'),
-          name: "ks1_wallet",
-          displayName: "KS1 Wallet"
-        },
-        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-        authenticatorSelection: {
-          userVerification: "required",
-          requireResidentKey: true
-        },
-        timeout: 60000
-      }
-    });
-    
-    // Store encrypted password with biometric binding
-    const encryptedPassword = await encryptWithPassword(password, 'biometric_key');
-    localStorage.setItem('ks1_biometric_credential', JSON.stringify({
-      id: credential.id,
-      encryptedPassword
-    }));
-    
-    return true;
-  } catch (err) {
-    console.log('Biometric registration skipped:', err.message);
-    return false;
-  }
-}
-
-// Authenticate with biometrics to retrieve password
-async function authenticateBiometric() {
-  if (!isBiometricSupported()) return null;
-  
-  const stored = localStorage.getItem('ks1_biometric_credential');
-  if (!stored) return null;
-  
-  try {
-    const { id } = JSON.parse(stored);
-    const challenge = new Uint8Array(32);
-    window.crypto.getRandomValues(challenge);
-    
-    const assertion = await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        allowCredentials: [{ type: "public-key", id: base64urlToBuffer(id) }],
-        userVerification: "required",
-        timeout: 60000
-      }
-    });
-    
-    // Retrieve encrypted password
-    const { encryptedPassword } = JSON.parse(stored);
-    const password = await decryptWithPassword(encryptedPassword, 'biometric_key');
-    return password;
-  } catch (err) {
-    console.log('Biometric auth failed:', err.message);
-    return null;
-  }
-}
-
-// Helper: Base64URL to ArrayBuffer
-function base64urlToBuffer(base64url) {
-  const padding = '='.repeat((4 - base64url.length % 4) % 4);
-  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/') + padding;
-  const bin = atob(base64);
-  const buffer = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) {
-    buffer[i] = bin.charCodeAt(i);
-  }
-  return buffer;
-}
-
-// Simple encryption using Web Crypto (for password only)
-async function encryptWithPassword(data, context) {
-  const keyMaterial = await window.crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(context),
-    { name: "PBKDF2" },
-    false,
-    ["deriveKey"]
-  );
-  
-  const key = await window.crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: new Uint8Array(16), iterations: 100000, hash: "SHA-256" },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt"]
-  );
-  
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await window.crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-    new TextEncoder().encode(data)
-  );
-  
-  return JSON.stringify({
-    iv: Array.from(iv),
-    data: Array.from(new Uint8Array(encrypted))
-  });
-}
-
-async function decryptWithPassword(encryptedJson, context) {
-  const { iv, data } = JSON.parse(encryptedJson);
-  const keyMaterial = await window.crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(context),
-    { name: "PBKDF2" },
-    false,
-    ["deriveKey"]
-  );
-  
-  const key = await window.crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: new Uint8Array(16), iterations: 100000, hash: "SHA-256" },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["decrypt"]
-  );
-  
-  const decrypted = await window.crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: new Uint8Array(iv) },
-    key,
-    new Uint8Array(data)
-  );
-  
-  return new TextDecoder().decode(decrypted);
-}
-
 // ===== UTILS =====
 function copy(text) {
 navigator.clipboard.writeText(text).then(() => alert('Copied!'));
@@ -679,7 +592,7 @@ button.textContent = '👁️';
 };
 }
 }
-// ===== WATERMARKS =====
+// ===== WATERMARKS (UPDATED) =====
 function createWatermarks() {
 const container = document.getElementById('watermarkContainer');
 const phrases = ['KS1 WALLET', 'SELF CUSTODY', 'WEB3 ALKEBULAN (AFRICA)'];
@@ -693,6 +606,16 @@ div.style.opacity = '0.06';
 div.style.fontSize = `${18 + Math.random() * 10}px`;
 container.appendChild(div);
 }
+// Add new watermark line
+const disclaimerDiv = document.createElement('div');
+disclaimerDiv.className = 'watermark-text';
+disclaimerDiv.textContent = 'Your Keys, Your Crypto. We Never Access Your Funds.';
+disclaimerDiv.style.top = '80%';
+disclaimerDiv.style.left = '10%';
+disclaimerDiv.style.opacity = '0.04';
+disclaimerDiv.style.fontSize = '16px';
+disclaimerDiv.style.transform = 'rotate(0deg)';
+container.appendChild(disclaimerDiv);
 }
 // ===== APP STATE =====
 let state = {
@@ -701,7 +624,9 @@ wallet: null,
 address: '',
 balance: '...',
 selectedNetworkId: 1,
-error: ''
+error: '',
+isBalanceHidden: false, // NEW
+usdValue: '...' // NEW
 };
 function getCurrentNetwork() {
 return SUPPORTED_NETWORKS.find(n => n.id === state.selectedNetworkId);
@@ -736,7 +661,6 @@ Your keys, your crypto. We never access your funds.
 <button class="btn btn-primary" onclick="handleCreate()">Create New Wallet</button>
 <button class="btn btn-primary" onclick="handleImport()">Import Wallet</button>
 <button class="btn btn-primary" onclick="goImpact()" style="margin-top:10px;">Our Mission</button>
-<button class="btn btn-secondary" onclick="goSettings()" style="margin-top:10px;">Security Settings</button>
 ${unlockSection}
 <div style="margin-top:24px; text-align:center; font-size:0.85rem; color:#64748b;">
 <span class="tooltip">?
@@ -828,38 +752,6 @@ Protecting your family’s future is part of self-custody. Act now—your legacy
 `;
 return;
 }
-// ===== NEW: SECURITY SETTINGS VIEW =====
-if (state.view === 'settings') {
-  app.innerHTML = `
-    <h2 class="dashboard-title">Security Settings</h2>
-    <div style="margin: 20px 0;">
-      <label style="display: flex; align-items: center; justify-content: space-between;">
-        <span>Enable Biometric Unlock</span>
-        <input type="checkbox" id="biometric-toggle" ${biometricEnabled ? 'checked' : ''} />
-      </label>
-      <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 8px;">
-        Use fingerprint or face to unlock your wallet
-      </p>
-    </div>
-    <button class="btn btn-secondary" onclick="goDashboard()" style="margin-top: 20px;">Back to Dashboard</button>
-  `;
-  
-  document.getElementById('biometric-toggle').onchange = (e) => {
-    biometricEnabled = e.target.checked;
-    localStorage.setItem('ks1_biometric_enabled', biometricEnabled.toString());
-    
-    if (biometricEnabled && state.wallet) {
-      const pwd = prompt('Enter your wallet password to enable biometrics:');
-      if (pwd) {
-        registerBiometricCredential(pwd).then(success => {
-          if (success) alert('Biometric unlock enabled!');
-          else alert('Biometric setup failed. Please try again.');
-        });
-      }
-    }
-  };
-  return;
-}
 if (['dashboard', 'send', 'receive', 'send-confirm'].includes(state.view)) {
 startInactivityListener();
 startLearningRotation();
@@ -942,6 +834,14 @@ const isBitcoin = currentNetwork.type === 'bitcoin';
 const balanceDisplay = isBitcoin
 ? `${parseFloat(state.balance).toFixed(8)} BTC`
 : `${parseFloat(state.balance).toFixed(4)} ${currentNetwork.symbol}`;
+
+// NEW: Toggle balance display
+const displayedBalance = state.isBalanceHidden ? '•••• ••••' : balanceDisplay;
+
+// NEW: Fetch USD value
+let usdDisplay = '≈ $' + state.usdValue + ' USD';
+if (state.usdValue === '...') usdDisplay = 'Loading USD value...';
+
 let networkSelector = '';
 if (!isBitcoin) {
 const evmOptions = SUPPORTED_NETWORKS
@@ -961,22 +861,28 @@ const learning = LEARNING_UNITS[currentLearningIndex];
 app.innerHTML = `
 <h2 class="dashboard-title">Dashboard</h2>
 ${networkSelector}
-<div style="margin: 20px 0; text-align:center;">
+
+<!-- NEW: Balance Section -->
+<div class="balance-section">
 <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">${currentNetwork.name} (${currentNetwork.symbol})</label>
-<div style="font-size:1.8rem; font-weight:700; color:var(--gold);">${balanceDisplay}</div>
+<div class="balance-display">
+${displayedBalance}
+<button class="toggle-balance" onclick="toggleBalanceVisibility()">👁️</button>
 </div>
-<div style="background:rgba(30,41,59,0.7); border-radius:12px; padding:16px; margin:24px 0;">
-<div style="display:flex; justify-content:space-between; align-items:center;">
-<code>${state.address.slice(0,6)}...${state.address.slice(-4)}</code>
-<button onclick="copy('${state.address}')" style="background:none; border:none; color:var(--gold); font-size:1.2rem;">📋</button>
+<div class="usd-value">${usdDisplay}</div>
 </div>
+
+<!-- NEW: Address Card -->
+<div class="address-card">
+<code class="address-code">${state.address}</code>
+<button class="copy-btn" onclick="copy('${state.address}')">📋 Copy</button>
 </div>
+
 <div class="flex">
 <button class="btn btn-primary" onclick="goSend()">Send</button>
 <button class="btn btn-receive" onclick="goReceive()">Receive</button>
 </div>
 <button class="btn btn-primary" onclick="goLegacy()" style="margin-top:15px;">Legacy Planning</button>
-<button class="btn btn-secondary" onclick="goSettings()" style="margin-top:10px;">Security Settings</button>
 ${isBitcoin ? `
 <div class="bitcoin-education">
 💡 Bitcoin is a different network from Ethereum.<br/>
@@ -1045,12 +951,6 @@ const isBitcoin = currentNetwork.type === 'bitcoin';
 const amountDisplay = isBitcoin
 ? `${state.sendAmount} BTC`
 : `${state.sendAmount} ${currentNetwork.symbol}`;
-
-// Biometric confirmation for transactions
-if (biometricEnabled && isBiometricSupported()) {
-  // This will be handled after password input
-}
-
 app.innerHTML = `
 <h2>Confirm Send</h2>
 <div style="background:rgba(30,41,59,0.7); padding:16px; border-radius:12px; margin:16px 0;">
@@ -1104,6 +1004,11 @@ app.innerHTML = `
 return;
 }
 }
+// ===== NEW: BALANCE TOGGLE FUNCTION =====
+function toggleBalanceVisibility() {
+state.isBalanceHidden = !state.isBalanceHidden;
+render();
+}
 // ===== ACTIONS =====
 function goHome() {
 state.view = 'landing';
@@ -1132,52 +1037,26 @@ function goLegacy() {
 state.view = 'legacy';
 render();
 }
-// ===== NEW: SETTINGS ACTION =====
-function goSettings() {
-  state.view = 'settings';
-  render();
-}
-
-// ===== UPDATED: HANDLE UNLOCK WITH BIOMETRICS =====
 async function handleUnlock() {
-  // Try biometric first if enabled
-  if (biometricEnabled && isBiometricSupported()) {
-    const biometricPwd = await authenticateBiometric();
-    if (biometricPwd) {
-      const wallet = await loadWallet(biometricPwd);
-      if (wallet) {
-        state.wallet = wallet;
-        state.address = wallet.address;
-        state.selectedNetworkId = 1;
-        state.view = 'dashboard';
-        fetchBalance();
-        render();
-        return;
-      }
-    }
-  }
-  
-  // Fallback to password
-  const pwd = document.getElementById('unlock-pwd').value;
-  if (!pwd) {
-    state.error = 'Please enter your wallet password';
-    render();
-    return;
-  }
-  const wallet = await loadWallet(pwd);
-  if (wallet) {
-    state.wallet = wallet;
-    state.address = wallet.address;
-    state.selectedNetworkId = 1;
-    state.view = 'dashboard';
-    fetchBalance();
-    render();
-  } else {
-    state.error = 'Incorrect password. Please try again.';
-    render();
-  }
+const pwd = document.getElementById('unlock-pwd').value;
+if (!pwd) {
+state.error = 'Please enter your wallet password';
+render();
+return;
 }
-
+const wallet = await loadWallet(pwd);
+if (wallet) {
+state.wallet = wallet;
+state.address = wallet.address;
+state.selectedNetworkId = 1;
+state.view = 'dashboard';
+fetchBalance();
+render();
+} else {
+state.error = 'Incorrect password. Please try again.';
+render();
+}
+}
 function handleCreate() {
 state.view = 'create';
 state.error = '';
@@ -1213,11 +1092,6 @@ state.mnemonic = mnemonic;
 state.selectedNetworkId = selectedNetwork.id;
 state.view = 'show-mnemonic';
 render();
-
-// Register biometric if enabled
-if (biometricEnabled) {
-  registerBiometricCredential(pwd);
-}
 }
 }
 function handleConfirmMnemonic() {
@@ -1241,11 +1115,6 @@ state.wallet = ethers.Wallet.fromPhrase(state.mnemonic);
 state.address = state.wallet.address;
 fetchBalance();
 render();
-
-// Register biometric if enabled
-if (biometricEnabled) {
-  registerBiometricCredential(document.getElementById('create-pwd')?.value || prompt('Enter password for biometrics:'));
-}
 }
 } else {
 state.error = 'Incorrect words. Try again.';
@@ -1292,11 +1161,6 @@ state.selectedNetworkId = selectedNetwork.id;
 state.view = 'dashboard';
 fetchBalance();
 render();
-
-// Register biometric if enabled
-if (biometricEnabled) {
-  registerBiometricCredential(pwd);
-}
 } catch {
 state.error = 'Invalid seed phrase';
 render();
@@ -1305,16 +1169,35 @@ render();
 }
 async function fetchBalance() {
 state.balance = 'Loading...';
+state.usdValue = '...';
 render();
+
 const currentNetwork = getCurrentNetwork();
+let balanceNum = 0;
 if (currentNetwork.type === 'bitcoin') {
-const bal = await getBitcoinBalance(state.address);
-state.balance = bal;
+balanceNum = await getBitcoinBalance(state.address);
+state.balance = balanceNum;
 } else {
 const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
 const bal = await provider.getBalance(state.address);
-state.balance = parseFloat(ethers.formatEther(bal));
+balanceNum = parseFloat(ethers.formatEther(bal));
+state.balance = balanceNum;
 }
+
+// Fetch USD value
+let symbol = '';
+if (currentNetwork.id === 1) symbol = 'ethereum';
+else if (currentNetwork.id === 56) symbol = 'binancecoin';
+else if (currentNetwork.id === 137) symbol = 'matic-network';
+else if (currentNetwork.id === 'bitcoin') symbol = 'bitcoin';
+
+if (symbol) {
+const usd = await fetchCryptoPrice(symbol);
+state.usdValue = (balanceNum * usd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+} else {
+state.usdValue = 'N/A';
+}
+
 render();
 }
 async function handleSend() {
@@ -1347,90 +1230,39 @@ state.sendAmount = amount;
 state.view = 'send-confirm';
 render();
 }
-// ===== UPDATED: HANDLE SEND CONFIRM WITH BIOMETRICS =====
 async function handleSendConfirm() {
-  // Biometric confirmation for transactions
-  if (biometricEnabled && isBiometricSupported()) {
-    const biometricPwd = await authenticateBiometric();
-    if (!biometricPwd) {
-      alert('Biometric verification required');
-      return;
-    }
-    // Re-validate wallet
-    const tempWallet = await loadWallet(biometricPwd);
-    if (!tempWallet || tempWallet.address !== state.wallet?.address) {
-      alert('Authentication failed');
-      return;
-    }
-    // Proceed with original flow using biometric password
-    const pwd = biometricPwd;
-    const currentNetwork = getCurrentNetwork();
-    const isBitcoin = currentNetwork.type === 'bitcoin';
-    if (isBitcoin) {
-      const uri = sendBitcoinURI(state.sendTo, state.sendAmount);
-      window.location.href = uri;
-      setTimeout(() => {
-        state.view = 'send-success';
-        render();
-      }, 1000);
-    } else {
-      const wallet = await loadWallet(pwd);
-      if (!wallet) {
-        alert('❌ Invalid password');
-        return;
-      }
-      try {
-        const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
-        const signer = wallet.connect(provider);
-        const tx = await signer.sendTransaction({
-          to: state.sendTo,
-          value: ethers.parseEther(state.sendAmount)
-        });
-        await tx.wait();
-        state.txHash = tx.hash;
-        state.view = 'send-success';
-        render();
-      } catch (err) {
-        alert('Transaction failed: ' + (err.reason || err.message));
-        goSend();
-      }
-    }
-    return;
-  }
-
-  // Original password flow
-  const pwd = document.getElementById('send-pwd').value;
-  const currentNetwork = getCurrentNetwork();
-  const isBitcoin = currentNetwork.type === 'bitcoin';
-  if (isBitcoin) {
-    const uri = sendBitcoinURI(state.sendTo, state.sendAmount);
-    window.location.href = uri;
-    setTimeout(() => {
-      state.view = 'send-success';
-      render();
-    }, 1000);
-  } else {
-    const wallet = await loadWallet(pwd);
-    if (!wallet) {
-      alert('❌ Invalid password');
-      return;
-    }
-    try {
-      const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
-      const signer = wallet.connect(provider);
-      const tx = await signer.sendTransaction({
-        to: state.sendTo,
-        value: ethers.parseEther(state.sendAmount)
-      });
-      await tx.wait();
-      state.txHash = tx.hash;
-      state.view = 'send-success';
-      render();
-    } catch (err) {
-      alert('Transaction failed: ' + (err.reason || err.message));
-      goSend();
-    }
-  }
+const pwd = document.getElementById('send-pwd').value;
+const currentNetwork = getCurrentNetwork();
+const isBitcoin = currentNetwork.type === 'bitcoin';
+if (isBitcoin) {
+const uri = sendBitcoinURI(state.sendTo, state.sendAmount);
+window.location.href = uri;
+setTimeout(() => {
+state.view = 'send-success';
+render();
+}, 1000);
+} else {
+const wallet = await loadWallet(pwd);
+if (!wallet) {
+alert('❌ Invalid password');
+return;
+}
+try {
+const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
+const signer = wallet.connect(provider);
+const tx = await signer.sendTransaction({
+to: state.sendTo,
+value: ethers.parseEther(state.sendAmount)
+});
+await tx.wait();
+state.txHash = tx.hash;
+state.view = 'send-success';
+render();
+} catch (err) {
+alert('Transaction failed: ' + (err.reason || err.message));
+goSend();
+}
+}
 }
 // Expose to global scope
 window.handleCreate = handleCreate;
@@ -1441,7 +1273,6 @@ window.goSend = goSend;
 window.goReceive = goReceive;
 window.goImpact = goImpact;
 window.goLegacy = goLegacy;
-window.goSettings = goSettings; // NEW
 window.handleCreateSubmit = handleCreateSubmit;
 window.handleConfirmMnemonic = handleConfirmMnemonic;
 window.handleConfirmWords = handleConfirmWords;
@@ -1450,6 +1281,8 @@ window.handleSend = handleSend;
 window.handleSendConfirm = handleSendConfirm;
 window.copy = copy;
 window.handleUnlock = handleUnlock;
+window.toggleBalanceVisibility = toggleBalanceVisibility; // NEW
+
 // Initialize
 createWatermarks();
 render();

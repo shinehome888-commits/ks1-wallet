@@ -254,6 +254,16 @@
       font-size: 0.85rem;
       color: #bfdbfe;
     }
+
+    /* Educational learning unit */
+    .learning-unit {
+      background: rgba(37, 99, 235, 0.1);
+      border-left: 3px solid var(--blue);
+      padding: 12px;
+      margin-top: 20px;
+      font-size: 0.85rem;
+      border-radius: 0 8px 8px 0;
+    }
   </style>
 </head>
 <body>
@@ -264,12 +274,77 @@
   </div>
 
   <script>
-    // ===== NETWORK REGISTRY (STEP 1) =====
+    // ===== EDUCATIONAL LEARNING UNITS =====
+    const LEARNING_UNITS = [
+      {
+        q: "What does 'non-custodial' mean?",
+        a: "You alone control your crypto. KS1 Wallet never holds or accesses your funds. Your keys, your crypto."
+      },
+      {
+        q: "Why must I save my seed phrase?",
+        a: "It’s your only backup to recover your wallet. KS1 Wallet can’t restore it for you. Store it offline safely."
+      },
+      {
+        q: "Can KS1 Wallet access my money?",
+        a: "No. We never see your keys or funds. This open-source wallet is built for self-ownership."
+      },
+      {
+        q: "What is a blockchain network?",
+        a: "A public system that records transactions securely. Bitcoin and Ethereum are separate networks with different rules."
+      },
+      {
+        q: "Why do Bitcoin transactions take longer?",
+        a: "Bitcoin confirms blocks every 10 minutes. Ethereum is faster but uses gas fees. Both are secure."
+      },
+      {
+        q: "What if I send crypto to the wrong address?",
+        a: "Transactions can’t be reversed. Always double-check addresses before sending. Your keys, your responsibility."
+      },
+      {
+        q: "Is KS1 Wallet free to use?",
+        a: "Yes. As a nonprofit project, we charge no fees. You only pay network fees (like Bitcoin’s miner fees)."
+      },
+      {
+        q: "Why can’t I use Ethereum tokens on Bitcoin?",
+        a: "Each network has its own rules. Sending ETH to a BTC address will lose your funds permanently."
+      },
+      {
+        q: "How does KS1 Wallet protect my privacy?",
+        a: "We store nothing on servers. All data stays in your browser. No tracking, no accounts, no spying."
+      },
+      {
+        q: "What makes self-custody empowering?",
+        a: "You own your money without banks or middlemen. True financial freedom starts with your keys."
+      }
+    ];
+
+    let currentLearningIndex = 0;
+    let learningInterval;
+
+    function startLearningRotation() {
+      // Clear any existing interval
+      if (learningInterval) clearInterval(learningInterval);
+      
+      // Rotate every 2 minutes (120,000 ms)
+      learningInterval = setInterval(() => {
+        currentLearningIndex = (currentLearningIndex + 1) % LEARNING_UNITS.length;
+        render(); // Re-render to show new tip
+      }, 120000);
+    }
+
+    function stopLearningRotation() {
+      if (learningInterval) {
+        clearInterval(learningInterval);
+        learningInterval = null;
+      }
+    }
+
+    // ===== NETWORK REGISTRY =====
     const SUPPORTED_NETWORKS = [
       { id: 1, name: 'Ethereum', symbol: 'ETH', type: 'evm' },
       { id: 56, name: 'BNB Chain', symbol: 'BNB', type: 'evm' },
       { id: 137, name: 'Polygon', symbol: 'MATIC', type: 'evm' },
-      { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', type: 'bitcoin' } // ← ADDED BITCOIN
+      { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', type: 'bitcoin' }
     ];
 
     const CHAINS = {
@@ -308,6 +383,7 @@
       state.view = 'landing';
       render();
       stopInactivityListener();
+      stopLearningRotation();
     }
 
     // ===== STORAGE =====
@@ -451,11 +527,10 @@
       wallet: null,
       address: '',
       balance: '...',
-      selectedNetworkId: 1, // Default to Ethereum
+      selectedNetworkId: 1,
       error: ''
     };
 
-    // Get current network object
     function getCurrentNetwork() {
       return SUPPORTED_NETWORKS.find(n => n.id === state.selectedNetworkId);
     }
@@ -467,6 +542,7 @@
 
       if (state.view === 'landing') {
         stopInactivityListener();
+        stopLearningRotation();
 
         let unlockSection = '';
         if (hasSavedWallet()) {
@@ -501,10 +577,10 @@
 
       if (['dashboard', 'send', 'receive', 'send-confirm'].includes(state.view)) {
         startInactivityListener();
+        startLearningRotation();
       }
 
       if (state.view === 'create') {
-        // Build network options from registry
         const networkOptions = SUPPORTED_NETWORKS.map(net => 
           `<option value="${net.id}">${net.name} (${net.symbol})</option>`
         ).join('');
@@ -598,6 +674,9 @@
           `;
         }
 
+        // Get current learning unit
+        const learning = LEARNING_UNITS[currentLearningIndex];
+
         app.innerHTML = `
           <h2 class="dashboard-title">Dashboard</h2>
 
@@ -634,6 +713,12 @@
               Why do I pay gas fees?
             </div>
           `}
+
+          <!-- Educational Learning Unit -->
+          <div class="learning-unit">
+            <strong>Learn:</strong> ${learning.q}<br/>
+            ${learning.a}
+          </div>
         `;
 
         if (!isBitcoin) {
@@ -782,7 +867,7 @@
       if (wallet) {
         state.wallet = wallet;
         state.address = wallet.address;
-        state.selectedNetworkId = 1; // Default to Ethereum after unlock
+        state.selectedNetworkId = 1;
         state.view = 'dashboard';
         fetchBalance();
         render();

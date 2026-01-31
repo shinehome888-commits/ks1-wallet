@@ -10,6 +10,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@noble/hashes@1.5.0/esm/sha256.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@scure/bip39@1.3.0/browser/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@scure/bip32@1.4.0/browser/index.min.js"></script>
+  <!-- REQUIRED: secp256k1 for Bitcoin key generation -->
+  <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.1.0/esm/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <style>
     :root {
@@ -275,6 +277,23 @@
       color: #64748b;
       z-index: 5;
     }
+
+    /* Password toggle */
+    .password-container {
+      position: relative;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--gold);
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
   </style>
 </head>
 <body>
@@ -288,6 +307,17 @@
   <div class="footer">© 2026 KS1 Wallet — A nonprofit project by KS1 Empire Group & Foundation {KS1EGF}</div>
 
   <script>
+    // ===== POLYFILL FOR OLDER BROWSERS =====
+    if (typeof window.crypto === 'undefined' || typeof window.crypto.getRandomValues === 'undefined') {
+      window.crypto = window.crypto || {};
+      window.crypto.getRandomValues = function(arr) {
+        for (let i = 0; i < arr.length; i++) {
+          arr[i] = Math.floor(Math.random() * 256);
+        }
+        return arr;
+      };
+    }
+
     // ===== EDUCATIONAL LEARNING UNITS (100 TIPS) =====
     const LEARNING_UNITS = [
       { q: "Why self-custody?", a: "Self-custody means you own your crypto—not a bank or app. KS1 Wallet never sees your keys or funds. Ever." },
@@ -487,6 +517,9 @@
 
     // ===== BITCOIN SUPPORT =====
     async function createBitcoinWallet() {
+      // Ensure noble-secp256k1 is ready
+      await nobleSecp256k1.utils.sha256(new Uint8Array([1]));
+      
       const mnemonic = bip39.generateMnemonic(bip39.wordlists.english, 128);
       const seed = bip39.mnemonicToSeedSync(mnemonic);
       const master = bip32.HDKey.fromMasterSeed(seed);
@@ -583,6 +616,23 @@
       return qr.createImgTag(6, 12);
     }
 
+    // ===== PASSWORD TOGGLE =====
+    function setupPasswordToggle(inputId, buttonId) {
+      const input = document.getElementById(inputId);
+      const button = document.getElementById(buttonId);
+      if (input && button) {
+        button.onclick = () => {
+          if (input.type === 'password') {
+            input.type = 'text';
+            button.textContent = '🙈';
+          } else {
+            input.type = 'password';
+            button.textContent = '👁️';
+          }
+        };
+      }
+    }
+
     // ===== WATERMARKS =====
     function createWatermarks() {
       const container = document.getElementById('watermarkContainer');
@@ -627,7 +677,10 @@
           unlockSection = `
             <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(212,175,55,0.2);">
               <p style="text-align:center; color:var(--gold); font-weight:600; margin-bottom:12px;">Wallet Password</p>
-              <input type="password" id="unlock-pwd" placeholder="Enter your wallet password" class="glow-on-focus" />
+              <div class="password-container">
+                <input type="password" id="unlock-pwd" placeholder="Enter your wallet password" class="glow-on-focus" />
+                <button class="toggle-password" id="toggle-unlock">👁️</button>
+              </div>
               <button class="btn btn-primary" onclick="handleUnlock()" style="margin-top:8px;">Unlock Wallet</button>
               ${state.error ? `<p style="color:#f87171; text-align:center; margin-top:8px;">${state.error}</p>` : ''}
             </div>
@@ -651,6 +704,10 @@
             What is a non-custodial wallet?
           </div>
         `;
+        
+        if (hasSavedWallet()) {
+          setupPasswordToggle('unlock-pwd', 'toggle-unlock');
+        }
         return;
       }
 
@@ -768,11 +825,15 @@
           <select id="create-network" class="btn btn-secondary" style="margin-bottom:12px;">
             ${networkOptions}
           </select>
-          <input type="password" id="create-pwd" placeholder="Password" class="glow-on-focus" />
+          <div class="password-container">
+            <input type="password" id="create-pwd" placeholder="Password" class="glow-on-focus" />
+            <button class="toggle-password" id="toggle-create">👁️</button>
+          </div>
           ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
           <button class="btn btn-primary" onclick="handleCreateSubmit()">Continue</button>
           <button class="btn btn-secondary" onclick="goHome()">Back</button>
         `;
+        setupPasswordToggle('create-pwd', 'toggle-create');
         return;
       }
 
@@ -819,11 +880,15 @@
             ${networkOptions}
           </select>
           <textarea id="import-seed" placeholder="Paste your 12-word recovery phrase" rows="3" class="glow-on-focus"></textarea>
-          <input type="password" id="import-pwd" placeholder="Set a new password (8+ chars)" class="glow-on-focus" />
+          <div class="password-container">
+            <input type="password" id="import-pwd" placeholder="Set a new password (8+ chars)" class="glow-on-focus" />
+            <button class="toggle-password" id="toggle-import">👁️</button>
+          </div>
           ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
           <button class="btn btn-primary" onclick="handleImportSubmit()">Import Wallet</button>
           <button class="btn btn-secondary" onclick="goHome()">Back</button>
         `;
+        setupPasswordToggle('import-pwd', 'toggle-import');
         return;
       }
 
@@ -961,10 +1026,14 @@
             <p><strong>To:</strong> ${state.sendTo.slice(0,10)}...${state.sendTo.slice(-4)}</p>
             <p><strong>Network:</strong> ${currentNetwork.name}</p>
           </div>
-          <input type="password" id="send-pwd" placeholder="Enter password to sign" class="glow-on-focus" style="margin:16px 0;" />
+          <div class="password-container">
+            <input type="password" id="send-pwd" placeholder="Enter password to sign" class="glow-on-focus" style="margin:16px 0;" />
+            <button class="toggle-password" id="toggle-send">👁️</button>
+          </div>
           <button class="btn btn-primary" onclick="handleSendConfirm()">Confirm & Send</button>
           <button class="btn btn-secondary" onclick="goSend()">Cancel</button>
         `;
+        setupPasswordToggle('send-pwd', 'toggle-send');
         return;
       }
 
@@ -1090,7 +1159,8 @@
           state.view = 'show-mnemonic';
           render();
         } catch (err) {
-          state.error = 'Failed to create Bitcoin wallet';
+          console.error('Bitcoin wallet error:', err);
+          state.error = 'Failed to create Bitcoin wallet. Please try again.';
           render();
         }
       } else {

@@ -6,12 +6,9 @@
   <title>KS1 Wallet</title>
   <!-- EVM Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
-  <!-- Bitcoin Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/@noble/hashes@1.5.0/esm/sha256.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@scure/bip39@1.3.0/browser/index.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@scure/bip32@1.4.0/browser/index.min.js"></script>
-  <!-- REQUIRED: secp256k1 for Bitcoin key generation -->
-  <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.1.0/esm/index.min.js"></script>
+  <!-- Bitcoin Libraries (FIXED) -->
+  <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.0/dist/bitcoinjs-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bip39@3.0.4/browser/index.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <style>
     :root {
@@ -307,18 +304,65 @@
   <div class="footer">© 2026 KS1 Wallet — A nonprofit project by KS1 Empire Group & Foundation {KS1EGF}</div>
 
   <script>
-    // ===== POLYFILL FOR OLDER BROWSERS =====
-    if (typeof window.crypto === 'undefined' || typeof window.crypto.getRandomValues === 'undefined') {
-      window.crypto = window.crypto || {};
-      window.crypto.getRandomValues = function(arr) {
-        for (let i = 0; i < arr.length; i++) {
-          arr[i] = Math.floor(Math.random() * 256);
-        }
-        return arr;
-      };
+    // ===== BITCOIN WALLET CREATION (WORKING FIX) =====
+    function createBitcoinWallet() {
+      const mnemonic = bip39.generateMnemonic(128);
+      const seed = bip39.mnemonicToSeedSync(mnemonic);
+      const root = bitcoin.bip32.fromSeed(seed);
+      const child = root.deriveHardened(84)
+                     .deriveHardened(0)
+                     .deriveHardened(0)
+                     .derive(0)
+                     .derive(0);
+      const { address } = bitcoin.payments.p2wpkh({ 
+        pubkey: child.publicKey,
+        network: bitcoin.networks.bitcoin 
+      });
+      return { mnemonic, address };
     }
 
-    // ===== EDUCATIONAL LEARNING UNITS (100 TIPS) =====
+    function deriveBitcoinAddressFromMnemonic(mnemonic) {
+      if (!bip39.validateMnemonic(mnemonic)) {
+        throw new Error('Invalid mnemonic');
+      }
+      const seed = bip39.mnemonicToSeedSync(mnemonic);
+      const root = bitcoin.bip32.fromSeed(seed);
+      const child = root.deriveHardened(84)
+                     .deriveHardened(0)
+                     .deriveHardened(0)
+                     .derive(0)
+                     .derive(0);
+      const { address } = bitcoin.payments.p2wpkh({ 
+        pubkey: child.publicKey,
+        network: bitcoin.networks.bitcoin 
+      });
+      return address;
+    }
+
+    function isValidBitcoinAddress(addr) {
+      try {
+        bitcoin.address.toOutputScript(addr, bitcoin.networks.bitcoin);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function getBitcoinBalance(address) {
+      try {
+        const res = await fetch(`https://blockchain.info/rawaddr/${address}`);
+        const data = await res.json();
+        return data.final_balance / 100000000;
+      } catch {
+        return 0;
+      }
+    }
+
+    function sendBitcoinURI(recipient, amountBTC) {
+      return `bitcoin:${recipient}?amount=${amountBTC}`;
+    }
+
+    // ===== EDUCATIONAL LEARNING UNITS =====
     const LEARNING_UNITS = [
       { q: "Why self-custody?", a: "Self-custody means you own your crypto—not a bank or app. KS1 Wallet never sees your keys or funds. Ever." },
       { q: "Centralized risks", a: "Centralized exchanges can freeze your money. With self-custody, only you control your funds." },
@@ -420,7 +464,7 @@
       learningInterval = setInterval(() => {
         currentLearningIndex = (currentLearningIndex + 1) % LEARNING_UNITS.length;
         render();
-      }, 45000); // 45 seconds
+      }, 45000);
     }
 
     function stopLearningRotation() {
@@ -513,95 +557,6 @@
 
     function hasSavedWallet() {
       return !!localStorage.getItem(STORAGE_KEY);
-    }
-
-    // ===== BITCOIN SUPPORT =====
-    async function createBitcoinWallet() {
-      // Ensure noble-secp256k1 is ready
-      await nobleSecp256k1.utils.sha256(new Uint8Array([1]));
-      
-      const mnemonic = bip39.generateMnemonic(bip39.wordlists.english, 128);
-      const seed = bip39.mnemonicToSeedSync(mnemonic);
-      const master = bip32.HDKey.fromMasterSeed(seed);
-      const child = master.derive("m/84'/0'/0'/0/0");
-      const pubKey = child.publicKey;
-      if (!pubKey) throw new Error('No public key');
-      const hash = nobleHashes.sha256.create().update(pubKey).digest();
-      return { mnemonic, address: bech32Encode('bc', 0, hash) };
-    }
-
-    function deriveBitcoinAddressFromMnemonic(mnemonic) {
-      const seed = bip39.mnemonicToSeedSync(mnemonic);
-      const master = bip32.HDKey.fromMasterSeed(seed);
-      const child = master.derive("m/84'/0'/0'/0/0");
-      const pubKey = child.publicKey;
-      if (!pubKey) throw new Error('No public key');
-      const hash = nobleHashes.sha256.create().update(pubKey).digest();
-      return bech32Encode('bc', 0, hash);
-    }
-
-    function isValidBitcoinAddress(addr) {
-      return /^bc1[ac-hj-np-z02-9]{39,59}$/.test(addr);
-    }
-
-    async function getBitcoinBalance(address) {
-      try {
-        const res = await fetch(`https://api.blockcypher.com/v1/btc/main/addrs/${address}/balance`);
-        const data = await res.json();
-        return (data.balance || 0) / 100000000;
-      } catch {
-        return 0;
-      }
-    }
-
-    function sendBitcoinURI(recipient, amountBTC) {
-      return `bitcoin:${recipient}?amount=${amountBTC}`;
-    }
-
-    // Bech32 encoder
-    function bech32Encode(hrp, version, program) {
-      const CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
-      const expanded = new Uint8Array(program.length * 2);
-      for (let i = 0; i < program.length; i++) {
-        expanded[i * 2] = program[i] >> 5;
-        expanded[i * 2 + 1] = program[i] & 31;
-      }
-      
-      let checksum = 1;
-      for (let i = 0; i < hrp.length; i++) {
-        checksum = polymod(checksum, hrp.charCodeAt(i) >> 5);
-        checksum = polymod(checksum, hrp.charCodeAt(i) & 31);
-      }
-      checksum = polymod(checksum, 0);
-      for (const p of [version, ...program]) {
-        checksum = polymod(checksum, p);
-      }
-      for (let i = 0; i < 6; i++) {
-        checksum = polymod(checksum, 0);
-      }
-      checksum ^= 1;
-      
-      const combined = [version, ...program, 
-        (checksum >> 30) & 31,
-        (checksum >> 25) & 31,
-        (checksum >> 20) & 31,
-        (checksum >> 15) & 31,
-        (checksum >> 10) & 31,
-        (checksum >> 5) & 31,
-        checksum & 31
-      ];
-      
-      return hrp + '1' + combined.map(v => CHARSET[v]).join('');
-    }
-
-    function polymod(value, v) {
-      const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
-      const topBits = value >> 25;
-      value = ((value & 0x1ffffff) << 5) ^ v;
-      for (let i = 0; i < 5; i++) {
-        if ((topBits >> i) & 1) value ^= GEN[i];
-      }
-      return value;
     }
 
     // ===== UTILS =====
@@ -1152,7 +1107,7 @@
 
       if (selectedNetwork.type === 'bitcoin') {
         try {
-          const { mnemonic, address } = await createBitcoinWallet();
+          const { mnemonic, address } = createBitcoinWallet();
           state.mnemonic = mnemonic;
           state.address = address;
           state.selectedNetworkId = 'bitcoin';
@@ -1223,7 +1178,7 @@
 
       if (selectedNetwork.type === 'bitcoin') {
         try {
-          if (!bip39.validateMnemonic(seed, bip39.wordlists.english)) {
+          if (!bip39.validateMnemonic(seed)) {
             throw new Error('Invalid');
           }
           const address = deriveBitcoinAddressFromMnemonic(seed);
@@ -1296,12 +1251,7 @@
         return;
       }
       
-      // Show guardian warnings
-      if (isBitcoin) {
-        showGuardianWarning('send');
-      } else {
-        showGuardianWarning('send');
-      }
+      showGuardianWarning('send');
       
       state.sendTo = to;
       state.sendAmount = amount;

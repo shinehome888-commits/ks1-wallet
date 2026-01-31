@@ -283,11 +283,11 @@
       { q: "Seed phrase safety", a: "Your seed phrase is your lifeline. Store it offline on metal—never in cloud notes or photos." },
       { q: "Phishing danger", a: "Never share your seed phrase—not even with 'support'. Real teams never ask for it." },
       { q: "AI & data", a: "AI learns from your data. Web3 lets you own it. Big Tech profits from your attention; Web3 rewards your participation." },
-      { q: "4th Industrial Revolution", a: "The 4th Industrial Revolution is about decentralization. Africa’s youth will shape Web3’s future." },
+      { q: "4th Industrial Revolution", a: "The 4th Industrial Revolution is about decentralization. Alkebulan (Africa)’s youth will shape Web3’s future." },
       { q: "Banking problems", a: "Banks profit from your deposits. Crypto returns control to you. In many countries, millions lack bank access entirely." },
       { q: "Inflation hedge", a: "Inflation steals value. Bitcoin has a fixed supply—making it a strong hedge against currency devaluation." },
       { q: "Nonprofit promise", a: "KS1 Wallet is free because we’re a nonprofit. No accounts, no tracking, no hidden fees." },
-      { q: "Africa’s advantage", a: "Africa leads in mobile money—now lead in self-custody. Financial inclusion starts with access—not permission." },
+      { q: "Alkebulan (Africa)’s advantage", a: "Alkebulan (Africa) leads in mobile money—now lead in self-custody. Financial inclusion starts with access—not permission." },
       { q: "Censorship resistance", a: "Governments can censor payments. Blockchain cannot. Your crypto is yours—even if borders close." },
       { q: "Phone security", a: "Your phone is your bank. Guard it well with strong passwords and auto-logout enabled." },
       { q: "Address verification", a: "Always verify recipient addresses before sending. Transactions are irreversible—double-check every character." },
@@ -303,7 +303,7 @@
       { q: "Estate planning", a: "Digital inheritance requires planning. Update your will to include crypto instructions." },
       { q: "Community power", a: "KS1 Wallet teaches while you use it. Learning is built-in—because financial literacy is a human right." },
       { q: "Transparency", a: "Transparency builds trust. Our code is open for all. Community feedback shapes our future." },
-      { q: "Solar nodes", a: "Solar-powered nodes keep networks running off-grid—perfect for Africa’s energy landscape." },
+      { q: "Solar nodes", a: "Solar-powered nodes keep networks running off-grid—perfect for Alkebulan (Africa)’s energy landscape." },
       { q: "Refugee aid", a: "Crypto empowers refugees with portable wealth. Digital sovereignty starts with self-custody." },
       { q: "Foundation mission", a: "KS1 Empire Foundation funds education, not executives. We’re building tools for financial dignity." },
       { q: "Movement mindset", a: "You’re not just using a wallet—you’re joining a movement for equitable digital futures." },
@@ -327,7 +327,7 @@
       { q: "DAO power", a: "DAOs are digital communities with shared treasuries. Your voice matters in decentralized governance." },
       { q: "Security audits", a: "Security audits catch bugs. But can’t guarantee safety. Bug bounties reward hackers for finding flaws." },
       { q: "Composability", a: "Composability lets apps build on each other—like Lego. Permissionless innovation means anyone can create." },
-      { q: "Mobile advantage", a: "Africa’s mobile penetration enables crypto adoption. Low-bandwidth optimization keeps KS1 Wallet accessible." },
+      { q: "Mobile advantage", a: "Alkebulan (Africa)’s mobile penetration enables crypto adoption. Low-bandwidth optimization keeps KS1 Wallet accessible." },
       { q: "Environmental care", a: "Optimized for energy efficiency. Promotes proof-of-stake networks like Ethereum. Carbon-neutral hosting via Cloudflare." },
       { q: "Public goods", a: "Public goods funding grows through crypto donations. Regenerative finance heals ecosystems and economies." },
       { q: "Zero-knowledge", a: "Zero-knowledge proofs let you prove things privately—without revealing sensitive data." },
@@ -356,7 +356,7 @@
       { q: "Education access", a: "KS1 Wallet works on low-end devices. Education shouldn’t require expensive hardware." },
       { q: "Community input", a: "We build what users need. Your feedback shapes KS1 Wallet’s nonprofit mission." },
       { q: "No ads ever", a: "Free forever—no ads, no paywalls. KS1 Empire Foundation funds development through grants." },
-      { q: "Local focus", a: "Built for African realities: intermittent connectivity, data costs, and mobile-first usage." },
+      { q: "Local focus", a: "Built for Alkebulan (Africa)’s realities: intermittent connectivity, data costs, and mobile-first usage." },
       { q: "Human rights", a: "Financial privacy is a human right. Censorship resistance protects activists and journalists globally." },
       { q: "Long-term view", a: "Think decades ahead. Bitcoin’s design ensures it outlives us all—if stored properly." },
       { q: "Metal storage", a: "Paper burns, phones break. Stainless steel seed plates survive fire, water, and time." },
@@ -365,7 +365,7 @@
       { q: "Small steps", a: "Start small. Learn with tiny amounts before managing significant value. Mastery comes with practice." },
       { q: "Patience pays", a: "Blockchain moves at its own pace. Rushing causes errors. Breathe, verify, then act." },
       { q: "Knowledge sharing", a: "Share what you learn. Empower your community—financial freedom grows through collective knowledge." },
-      { q: "Hopeful tech", a: "Technology should uplift humanity. KS1 Wallet exists to make that real—for Africa and the world." }
+      { q: "Hopeful tech", a: "Technology should uplift humanity. KS1 Wallet exists to make that real—for Alkebulan (Africa) and the world." }
     ];
 
     let currentLearningIndex = 0;
@@ -572,7 +572,7 @@
     // ===== WATERMARKS =====
     function createWatermarks() {
       const container = document.getElementById('watermarkContainer');
-      const phrases = ['KS1 WALLET', 'SELF CUSTODY', 'WEB3 AFRICA'];
+      const phrases = ['KS1 WALLET', 'SELF CUSTODY', 'WEB3 ALKEBULAN (AFRICA)'];
       for (let i = 0; i < 30; i++) {
         const div = document.createElement('div');
         div.className = 'watermark-text';
@@ -622,13 +622,13 @@
 
         app.innerHTML = `
           <h1>KS1 Wallet</h1>
-          <p class="disclaimer">Non-custodial • Open-source • Africa-built</p>
+          <p class="disclaimer">Non-custodial • Open-source • Alkebulan (Africa)-built</p>
           <p style="text-align:center; color:#94a3b8; margin:20px 0;">
             Your keys, your crypto. We never access your funds.
           </p>
           <button class="btn btn-primary" onclick="handleCreate()">Create New Wallet</button>
           <button class="btn btn-primary" onclick="handleImport()">Import Wallet</button>
-          <button class="btn btn-secondary" onclick="goImpact()" style="margin-top:10px;">Our Mission</button>
+          <button class="btn btn-primary" onclick="goImpact()" style="margin-top:10px;">Our Mission</button>
           ${unlockSection}
           <div style="margin-top:24px; text-align:center; font-size:0.85rem; color:#64748b;">
             <span class="tooltip">?
@@ -655,8 +655,8 @@
           </div>
           
           <div class="learning-unit">
-            <strong>African Roots</strong><br/>
-            Built for Africa’s mobile-first reality. Supports low-bandwidth, low-end devices.
+            <strong>Alkebulan (Africa) Roots</strong><br/>
+            Built for Alkebulan (Africa)’s mobile-first reality. Supports low-bandwidth, low-end devices.
           </div>
           
           <div class="learning-unit">
@@ -861,7 +861,7 @@
             <button class="btn btn-receive" onclick="goReceive()">Receive</button>
           </div>
 
-          <button class="btn btn-secondary" onclick="goLegacy()" style="margin-top:15px;">Legacy Planning</button>
+          <button class="btn btn-primary" onclick="goLegacy()" style="margin-top:15px;">Legacy Planning</button>
 
           ${isBitcoin ? `
             <div class="bitcoin-education">

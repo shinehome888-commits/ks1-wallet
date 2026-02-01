@@ -181,7 +181,6 @@ border-radius: 8px;
 font-family: monospace;
 font-size: 0.95rem;
 border: 1px solid rgba(212, 175, 55, 0.3);
-cursor: pointer;
 }
 .tooltip {
 position: relative;
@@ -551,10 +550,7 @@ wallet: null,
 address: '',
 balance: '...',
 selectedNetworkId: 1,
-error: '',
-isBalanceHidden: false,
-isAddressVisible: false,
-usdValue: '...'
+error: ''
 };
 function getCurrentNetwork() {
 return SUPPORTED_NETWORKS.find(n => n.id === state.selectedNetworkId);
@@ -589,6 +585,7 @@ Your keys, your crypto. We never access your funds.
 <button class="btn btn-primary" onclick="handleCreate()">Create New Wallet</button>
 <button class="btn btn-primary" onclick="handleImport()">Import Wallet</button>
 <button class="btn btn-primary" onclick="goImpact()" style="margin-top:10px;">Our Mission</button>
+<button class="btn btn-secondary" onclick="goTransparency()" style="margin-top:10px;">Transparency & Ethics</button>
 ${unlockSection}
 <div style="margin-top:24px; text-align:center; font-size:0.85rem; color:#64748b;">
 <span class="tooltip">?
@@ -629,6 +626,49 @@ Optimized for energy efficiency. Carbon-neutral hosting via Cloudflare.
 <strong>Future Vision</strong><br/>
 Building tools for the 4th Industrial Revolution—where AI, blockchain, and human dignity intersect.
 </div>
+<button class="btn btn-primary" onclick="goHome()" style="margin-top:20px;">Back to Home</button>
+`;
+return;
+}
+// ===== NEW: TRANSPARENCY VIEW =====
+if (state.view === 'transparency') {
+app.innerHTML = `
+<h2 class="dashboard-title">Transparency & Ethics</h2>
+
+<div class="learning-unit">
+<strong>How KS1 Wallet Works</strong><br/>
+• Self-custodial crypto wallet<br/>
+• You fully control your private keys<br/>
+• Runs locally on your device<br/>
+• No centralized account required<br/>
+• Built with free and open-source tools
+</div>
+
+<div class="learning-unit" style="border-left-color: var(--gold);">
+<strong>What We NEVER Do</strong><br/>
+• Store your private keys<br/>
+• Access your funds<br/>
+• Track your transactions<br/>
+• Collect personal data<br/>
+• Sell your data<br/>
+• Control or reverse transactions
+</div>
+
+<div class="learning-unit">
+<strong>What You Control</strong><br/>
+• Your private keys<br/>
+• Your wallet access<br/>
+• Your funds<br/>
+• Your transaction decisions
+</div>
+
+<div class="learning-unit" style="background: rgba(212, 175, 55, 0.1); border-left-color: var(--gold);">
+<strong>Nonprofit & Ethics Statement</strong><br/>
+KS1 Wallet is built under a nonprofit mission.<br/>
+Our goal is financial education, digital freedom,<br/>
+and ethical access to blockchain technology.
+</div>
+
 <button class="btn btn-primary" onclick="goHome()" style="margin-top:20px;">Back to Home</button>
 `;
 return;
@@ -762,11 +802,6 @@ const isBitcoin = currentNetwork.type === 'bitcoin';
 const balanceDisplay = isBitcoin
 ? `${parseFloat(state.balance).toFixed(8)} BTC`
 : `${parseFloat(state.balance).toFixed(4)} ${currentNetwork.symbol}`;
-
-// Toggle visibility
-const displayedBalance = state.isBalanceHidden ? '•••• ••••' : balanceDisplay;
-const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'} USD`;
-
 let networkSelector = '';
 if (!isBitcoin) {
 const evmOptions = SUPPORTED_NETWORKS
@@ -782,42 +817,25 @@ ${evmOptions}
 </div>
 `;
 }
-
-// Address display (only when visible)
-const addressSection = state.isAddressVisible
-? `<div style="text-align:center; margin:16px 0;">
-     <code onclick="copy('${state.address}')">${state.address}</code>
-   </div>`
-: '';
-
 const learning = LEARNING_UNITS[currentLearningIndex];
 app.innerHTML = `
 <h2 class="dashboard-title">Dashboard</h2>
-
 ${networkSelector}
-
 <div style="margin: 20px 0; text-align:center;">
 <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">${currentNetwork.name} (${currentNetwork.symbol})</label>
-<div style="font-size:1.8rem; font-weight:700; color:var(--gold); display:flex; align-items:center; justify-content:center;">
-${displayedBalance}
-<button class="toggle-balance" onclick="toggleBalanceVisibility()" style="background:none; border:none; color:var(--gold); font-size:1.4rem; margin-left:8px;">👁️</button>
+<div style="font-size:1.8rem; font-weight:700; color:var(--gold);">${balanceDisplay}</div>
 </div>
-<div style="color:#94a3b8; font-size:0.95rem; margin-top:6px;">${displayedUSD}</div>
+<div style="background:rgba(30,41,59,0.7); border-radius:12px; padding:16px; margin:24px 0;">
+<div style="display:flex; justify-content:space-between; align-items:center;">
+<code>${state.address.slice(0,6)}...${state.address.slice(-4)}</code>
+<button onclick="copy('${state.address}')" style="background:none; border:none; color:var(--gold); font-size:1.2rem;">📋</button>
 </div>
-
-<button class="btn btn-primary" onclick="toggleAddressVisibility()" style="margin:10px 0;">
-${state.isAddressVisible ? 'Hide Wallet Address' : 'Show Wallet Address'}
-</button>
-
-${addressSection}
-
+</div>
 <div class="flex">
 <button class="btn btn-primary" onclick="goSend()">Send</button>
 <button class="btn btn-receive" onclick="goReceive()">Receive</button>
 </div>
-
 <button class="btn btn-primary" onclick="goLegacy()" style="margin-top:15px;">Legacy Planning</button>
-
 ${isBitcoin ? `
 <div class="bitcoin-education">
 💡 Bitcoin is a different network from Ethereum.<br/>
@@ -832,13 +850,11 @@ ${isBitcoin ? `
 Why do I pay gas fees?
 </div>
 `}
-
 <div class="learning-unit">
 <strong>Learn:</strong> ${learning.q}<br/>
 ${learning.a}
 </div>
 `;
-
 if (!isBitcoin) {
 document.getElementById('chain-select').value = state.selectedNetworkId;
 document.getElementById('chain-select').onchange = (e) => {
@@ -941,15 +957,6 @@ app.innerHTML = `
 return;
 }
 }
-// ===== NEW TOGGLE FUNCTIONS =====
-function toggleBalanceVisibility() {
-state.isBalanceHidden = !state.isBalanceHidden;
-render();
-}
-function toggleAddressVisibility() {
-state.isAddressVisible = !state.isAddressVisible;
-render();
-}
 // ===== ACTIONS =====
 function goHome() {
 state.view = 'landing';
@@ -976,6 +983,11 @@ render();
 }
 function goLegacy() {
 state.view = 'legacy';
+render();
+}
+// ===== NEW ACTION =====
+function goTransparency() {
+state.view = 'transparency';
 render();
 }
 async function handleUnlock() {
@@ -1112,37 +1124,14 @@ async function fetchBalance() {
 state.balance = 'Loading...';
 render();
 const currentNetwork = getCurrentNetwork();
-let balanceNum = 0;
 if (currentNetwork.type === 'bitcoin') {
-balanceNum = await getBitcoinBalance(state.address);
-state.balance = balanceNum;
+const bal = await getBitcoinBalance(state.address);
+state.balance = bal;
 } else {
 const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
 const bal = await provider.getBalance(state.address);
-balanceNum = parseFloat(ethers.formatEther(bal));
-state.balance = balanceNum;
+state.balance = parseFloat(ethers.formatEther(bal));
 }
-
-// Fetch USD value
-let symbol = '';
-if (currentNetwork.id === 1) symbol = 'ethereum';
-else if (currentNetwork.id === 56) symbol = 'binancecoin';
-else if (currentNetwork.id === 137) symbol = 'matic-network';
-else if (currentNetwork.id === 'bitcoin') symbol = 'bitcoin';
-
-if (symbol) {
-try {
-const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${symbol}&vs_currencies=usd`);
-const data = await res.json();
-const usdPrice = data[symbol]?.usd || 0;
-state.usdValue = (balanceNum * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-} catch (e) {
-state.usdValue = 'N/A';
-}
-} else {
-state.usdValue = 'N/A';
-}
-
 render();
 }
 async function handleSend() {
@@ -1218,6 +1207,7 @@ window.goSend = goSend;
 window.goReceive = goReceive;
 window.goImpact = goImpact;
 window.goLegacy = goLegacy;
+window.goTransparency = goTransparency; // ← NEW
 window.handleCreateSubmit = handleCreateSubmit;
 window.handleConfirmMnemonic = handleConfirmMnemonic;
 window.handleConfirmWords = handleConfirmWords;
@@ -1226,8 +1216,6 @@ window.handleSend = handleSend;
 window.handleSendConfirm = handleSendConfirm;
 window.copy = copy;
 window.handleUnlock = handleUnlock;
-window.toggleBalanceVisibility = toggleBalanceVisibility;
-window.toggleAddressVisibility = toggleAddressVisibility;
 // Initialize
 createWatermarks();
 render();

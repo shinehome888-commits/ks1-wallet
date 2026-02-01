@@ -181,7 +181,6 @@ border-radius: 8px;
 font-family: monospace;
 font-size: 0.95rem;
 border: 1px solid rgba(212, 175, 55, 0.3);
-cursor: pointer;
 }
 .tooltip {
 position: relative;
@@ -505,7 +504,7 @@ return !!localStorage.getItem(STORAGE_KEY);
 }
 // ===== UTILS =====
 function copy(text) {
-navigator.clipboard.writeText(text).then(() => {});
+navigator.clipboard.writeText(text).then(() => alert('Copied!'));
 }
 function generateQR(text) {
 const qr = qrcode(0, 'M');
@@ -552,8 +551,6 @@ address: '',
 balance: '...',
 selectedNetworkId: 1,
 error: '',
-isBalanceHidden: false,
-addressVisible: false,
 usdValue: '...'
 };
 function getCurrentNetwork() {
@@ -763,16 +760,8 @@ const balanceDisplay = isBitcoin
 ? `${parseFloat(state.balance).toFixed(8)} BTC`
 : `${parseFloat(state.balance).toFixed(4)} ${currentNetwork.symbol}`;
 
-// Synced visibility for balance + USD
-const displayedBalance = state.isBalanceHidden ? '•••• ••••' : balanceDisplay;
-const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'} USD`;
-
-// Address visibility
-const addressSection = state.addressVisible
-? `<div style="text-align:center; margin:16px 0;">
-     <code onclick="copy('${state.address}')">${state.address}</code>
-   </div>`
-: '';
+// Fetch USD value
+let usdDisplay = `≈ $${state.usdValue || '...'} USD`;
 
 let networkSelector = '';
 if (!isBitcoin) {
@@ -781,8 +770,9 @@ const evmOptions = SUPPORTED_NETWORKS
 .map(n => `<option value="${n.id}">${n.name}</option>`)
 .join('');
 networkSelector = `
-<div style="margin: 16px 0;">
-<select id="chain-select" class="btn btn-secondary" style="width:100%; padding:10px; background:rgba(212,175,55,0.1); color:var(--gold); border:1px solid var(--gold);">
+<div style="margin: 20px 0;">
+<label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">Network</label>
+<select id="chain-select" class="btn btn-secondary" style="width:100%; padding:12px; background:rgba(212,175,55,0.1); color:var(--gold); border:1px solid var(--gold);">
 ${evmOptions}
 </select>
 </div>
@@ -793,34 +783,28 @@ const learning = LEARNING_UNITS[currentLearningIndex];
 app.innerHTML = `
 <h2 class="dashboard-title">Dashboard</h2>
 
-<!-- Network moved directly under title -->
-<div style="text-align:center; margin:12px 0; color:var(--gold); font-weight:600;">
-${currentNetwork.name} (${currentNetwork.symbol})
-</div>
+${networkSelector}
 
-<!-- Balance + USD synced visibility -->
 <div style="margin: 20px 0; text-align:center;">
-<div style="font-size:1.8rem; font-weight:700; color:var(--gold); display:flex; align-items:center; justify-content:center;">
-${displayedBalance}
-<button class="toggle-balance" onclick="toggleBalanceVisibility()" style="background:none; border:none; color:var(--gold); font-size:1.4rem; margin-left:8px;">👁️</button>
-</div>
-<div class="usd-value" style="color:#94a3b8; font-size:0.95rem; margin-top:6px;">
-${displayedUSD}
-</div>
+<label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">${currentNetwork.name} (${currentNetwork.symbol})</label>
+<div style="font-size:1.8rem; font-weight:700; color:var(--gold);">${balanceDisplay}</div>
+<div style="color:#94a3b8; font-size:0.95rem; margin-top:6px;">${usdDisplay}</div>
 </div>
 
-<!-- Show/Hide Address Button -->
-<button class="btn btn-primary" onclick="toggleAddressVisibility()" style="margin:10px 0;">
-${state.addressVisible ? 'Hide Wallet Address' : 'Show Wallet Address'}
-</button>
-
-${addressSection}
+<div style="background:rgba(30,41,59,0.7); border-radius:12px; padding:16px; margin:24px 0;">
+<div style="display:flex; justify-content:space-between; align-items:center;">
+<code>${state.address.slice(0,6)}...${state.address.slice(-4)}</code>
+<button onclick="copy('${state.address}')" style="background:none; border:none; color:var(--gold); font-size:1.2rem;">📋</button>
+</div>
+</div>
 
 <div class="flex">
 <button class="btn btn-primary" onclick="goSend()">Send</button>
 <button class="btn btn-receive" onclick="goReceive()">Receive</button>
 </div>
+
 <button class="btn btn-primary" onclick="goLegacy()" style="margin-top:15px;">Legacy Planning</button>
+
 ${isBitcoin ? `
 <div class="bitcoin-education">
 💡 Bitcoin is a different network from Ethereum.<br/>
@@ -835,6 +819,7 @@ ${isBitcoin ? `
 Why do I pay gas fees?
 </div>
 `}
+
 <div class="learning-unit">
 <strong>Learn:</strong> ${learning.q}<br/>
 ${learning.a}
@@ -942,15 +927,6 @@ app.innerHTML = `
 `;
 return;
 }
-}
-// ===== NEW: TOGGLE FUNCTIONS =====
-function toggleBalanceVisibility() {
-state.isBalanceHidden = !state.isBalanceHidden;
-render();
-}
-function toggleAddressVisibility() {
-state.addressVisible = !state.addressVisible;
-render();
 }
 // ===== ACTIONS =====
 function goHome() {
@@ -1138,7 +1114,7 @@ const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${sym
 const data = await res.json();
 const usdPrice = data[symbol]?.usd || 0;
 state.usdValue = (balanceNum * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-} catch {
+} catch (e) {
 state.usdValue = 'N/A';
 }
 } else {
@@ -1228,8 +1204,6 @@ window.handleSend = handleSend;
 window.handleSendConfirm = handleSendConfirm;
 window.copy = copy;
 window.handleUnlock = handleUnlock;
-window.toggleBalanceVisibility = toggleBalanceVisibility;
-window.toggleAddressVisibility = toggleAddressVisibility;
 // Initialize
 createWatermarks();
 render();

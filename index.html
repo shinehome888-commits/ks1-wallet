@@ -181,6 +181,7 @@ border-radius: 8px;
 font-family: monospace;
 font-size: 0.95rem;
 border: 1px solid rgba(212, 175, 55, 0.3);
+cursor: pointer;
 }
 .tooltip {
 position: relative;
@@ -258,59 +259,6 @@ color: var(--gold);
 cursor: pointer;
 font-size: 1.2rem;
 }
-
-/* ===== NEW: BALANCE TOGGLE & USD VALUE ===== */
-.balance-section {
-text-align: center;
-margin: 24px 0;
-}
-.balance-display {
-font-size: 2.2rem;
-font-weight: 800;
-color: var(--gold);
-letter-spacing: -0.5px;
-margin: 12px 0;
-}
-.usd-value {
-color: #94a3b8;
-font-size: 0.95rem;
-margin-top: 4px;
-}
-.toggle-balance {
-background: none;
-border: none;
-color: var(--gold);
-font-size: 1.4rem;
-cursor: pointer;
-margin-left: 8px;
-vertical-align: middle;
-}
-.address-card {
-background: rgba(30, 41, 59, 0.7);
-border-radius: 16px;
-padding: 18px;
-margin: 20px 0;
-display: flex;
-justify-content: space-between;
-align-items: center;
-}
-.address-code {
-font-family: monospace;
-font-size: 1.05rem;
-word-break: break-all;
-}
-.copy-btn {
-background: rgba(212, 175, 55, 0.2);
-border: 1px solid rgba(212, 175, 55, 0.4);
-border-radius: 8px;
-padding: 6px 12px;
-color: var(--gold);
-cursor: pointer;
-font-size: 1rem;
-}
-.copy-btn:hover {
-background: rgba(212, 175, 55, 0.3);
-}
 </style>
 </head>
 <body>
@@ -321,17 +269,6 @@ background: rgba(212, 175, 55, 0.3);
 <!-- Professional Footer -->
 <div class="footer">© 2026 KS1 Wallet — A nonprofit project by KS1 Empire Group & Foundation {KS1EGF}</div>
 <script>
-// ===== PRICE FETCHING (NEW) =====
-async function fetchCryptoPrice(symbol) {
-  try {
-    const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${symbol}&vs_currencies=usd`);
-    const data = await res.json();
-    return data[symbol]?.usd || 0;
-  } catch {
-    return 0;
-  }
-}
-
 // ===== BITCOIN WALLET CREATION (WORKING FIX) =====
 function createBitcoinWallet() {
 const mnemonic = bip39.generateMnemonic(128);
@@ -568,7 +505,7 @@ return !!localStorage.getItem(STORAGE_KEY);
 }
 // ===== UTILS =====
 function copy(text) {
-navigator.clipboard.writeText(text).then(() => alert('Copied!'));
+navigator.clipboard.writeText(text).then(() => {});
 }
 function generateQR(text) {
 const qr = qrcode(0, 'M');
@@ -592,7 +529,7 @@ button.textContent = '👁️';
 };
 }
 }
-// ===== WATERMARKS (UPDATED) =====
+// ===== WATERMARKS =====
 function createWatermarks() {
 const container = document.getElementById('watermarkContainer');
 const phrases = ['KS1 WALLET', 'SELF CUSTODY', 'WEB3 ALKEBULAN (AFRICA)'];
@@ -606,16 +543,6 @@ div.style.opacity = '0.06';
 div.style.fontSize = `${18 + Math.random() * 10}px`;
 container.appendChild(div);
 }
-// Add new watermark line
-const disclaimerDiv = document.createElement('div');
-disclaimerDiv.className = 'watermark-text';
-disclaimerDiv.textContent = 'Your Keys, Your Crypto. We Never Access Your Funds.';
-disclaimerDiv.style.top = '80%';
-disclaimerDiv.style.left = '10%';
-disclaimerDiv.style.opacity = '0.04';
-disclaimerDiv.style.fontSize = '16px';
-disclaimerDiv.style.transform = 'rotate(0deg)';
-container.appendChild(disclaimerDiv);
 }
 // ===== APP STATE =====
 let state = {
@@ -625,8 +552,9 @@ address: '',
 balance: '...',
 selectedNetworkId: 1,
 error: '',
-isBalanceHidden: false, // NEW
-usdValue: '...' // NEW
+isBalanceHidden: false,
+addressVisible: false,
+usdValue: '...'
 };
 function getCurrentNetwork() {
 return SUPPORTED_NETWORKS.find(n => n.id === state.selectedNetworkId);
@@ -835,12 +763,16 @@ const balanceDisplay = isBitcoin
 ? `${parseFloat(state.balance).toFixed(8)} BTC`
 : `${parseFloat(state.balance).toFixed(4)} ${currentNetwork.symbol}`;
 
-// NEW: Toggle balance display
+// Synced visibility for balance + USD
 const displayedBalance = state.isBalanceHidden ? '•••• ••••' : balanceDisplay;
+const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'} USD`;
 
-// NEW: Fetch USD value
-let usdDisplay = '≈ $' + state.usdValue + ' USD';
-if (state.usdValue === '...') usdDisplay = 'Loading USD value...';
+// Address visibility
+const addressSection = state.addressVisible
+? `<div style="text-align:center; margin:16px 0;">
+     <code onclick="copy('${state.address}')">${state.address}</code>
+   </div>`
+: '';
 
 let networkSelector = '';
 if (!isBitcoin) {
@@ -849,34 +781,40 @@ const evmOptions = SUPPORTED_NETWORKS
 .map(n => `<option value="${n.id}">${n.name}</option>`)
 .join('');
 networkSelector = `
-<div style="margin: 20px 0;">
-<label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">Network</label>
-<select id="chain-select" class="btn btn-secondary" style="width:100%; padding:12px; background:rgba(212,175,55,0.1); color:var(--gold); border:1px solid var(--gold);">
+<div style="margin: 16px 0;">
+<select id="chain-select" class="btn btn-secondary" style="width:100%; padding:10px; background:rgba(212,175,55,0.1); color:var(--gold); border:1px solid var(--gold);">
 ${evmOptions}
 </select>
 </div>
 `;
 }
+
 const learning = LEARNING_UNITS[currentLearningIndex];
 app.innerHTML = `
 <h2 class="dashboard-title">Dashboard</h2>
-${networkSelector}
 
-<!-- NEW: Balance Section -->
-<div class="balance-section">
-<label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">${currentNetwork.name} (${currentNetwork.symbol})</label>
-<div class="balance-display">
+<!-- Network moved directly under title -->
+<div style="text-align:center; margin:12px 0; color:var(--gold); font-weight:600;">
+${currentNetwork.name} (${currentNetwork.symbol})
+</div>
+
+<!-- Balance + USD synced visibility -->
+<div style="margin: 20px 0; text-align:center;">
+<div style="font-size:1.8rem; font-weight:700; color:var(--gold); display:flex; align-items:center; justify-content:center;">
 ${displayedBalance}
-<button class="toggle-balance" onclick="toggleBalanceVisibility()">👁️</button>
+<button class="toggle-balance" onclick="toggleBalanceVisibility()" style="background:none; border:none; color:var(--gold); font-size:1.4rem; margin-left:8px;">👁️</button>
 </div>
-<div class="usd-value">${usdDisplay}</div>
+<div class="usd-value" style="color:#94a3b8; font-size:0.95rem; margin-top:6px;">
+${displayedUSD}
+</div>
 </div>
 
-<!-- NEW: Address Card -->
-<div class="address-card">
-<code class="address-code">${state.address}</code>
-<button class="copy-btn" onclick="copy('${state.address}')">📋 Copy</button>
-</div>
+<!-- Show/Hide Address Button -->
+<button class="btn btn-primary" onclick="toggleAddressVisibility()" style="margin:10px 0;">
+${state.addressVisible ? 'Hide Wallet Address' : 'Show Wallet Address'}
+</button>
+
+${addressSection}
 
 <div class="flex">
 <button class="btn btn-primary" onclick="goSend()">Send</button>
@@ -902,6 +840,7 @@ Why do I pay gas fees?
 ${learning.a}
 </div>
 `;
+
 if (!isBitcoin) {
 document.getElementById('chain-select').value = state.selectedNetworkId;
 document.getElementById('chain-select').onchange = (e) => {
@@ -1004,9 +943,13 @@ app.innerHTML = `
 return;
 }
 }
-// ===== NEW: BALANCE TOGGLE FUNCTION =====
+// ===== NEW: TOGGLE FUNCTIONS =====
 function toggleBalanceVisibility() {
 state.isBalanceHidden = !state.isBalanceHidden;
+render();
+}
+function toggleAddressVisibility() {
+state.addressVisible = !state.addressVisible;
 render();
 }
 // ===== ACTIONS =====
@@ -1169,9 +1112,7 @@ render();
 }
 async function fetchBalance() {
 state.balance = 'Loading...';
-state.usdValue = '...';
 render();
-
 const currentNetwork = getCurrentNetwork();
 let balanceNum = 0;
 if (currentNetwork.type === 'bitcoin') {
@@ -1192,8 +1133,14 @@ else if (currentNetwork.id === 137) symbol = 'matic-network';
 else if (currentNetwork.id === 'bitcoin') symbol = 'bitcoin';
 
 if (symbol) {
-const usd = await fetchCryptoPrice(symbol);
-state.usdValue = (balanceNum * usd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+try {
+const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${symbol}&vs_currencies=usd`);
+const data = await res.json();
+const usdPrice = data[symbol]?.usd || 0;
+state.usdValue = (balanceNum * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+} catch {
+state.usdValue = 'N/A';
+}
 } else {
 state.usdValue = 'N/A';
 }
@@ -1281,8 +1228,8 @@ window.handleSend = handleSend;
 window.handleSendConfirm = handleSendConfirm;
 window.copy = copy;
 window.handleUnlock = handleUnlock;
-window.toggleBalanceVisibility = toggleBalanceVisibility; // NEW
-
+window.toggleBalanceVisibility = toggleBalanceVisibility;
+window.toggleAddressVisibility = toggleAddressVisibility;
 // Initialize
 createWatermarks();
 render();

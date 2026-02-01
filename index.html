@@ -181,7 +181,6 @@ border-radius: 8px;
 font-family: monospace;
 font-size: 0.95rem;
 border: 1px solid rgba(212, 175, 55, 0.3);
-cursor: pointer;
 }
 .tooltip {
 position: relative;
@@ -633,52 +632,48 @@ Building tools for the 4th Industrial Revolution—where AI, blockchain, and hum
 `;
 return;
 }
-// ===== TRANSPARENCY VIEW (BLUE BACKGROUND) =====
+// ===== TRANSPARENCY VIEW (MATCHES "OUR MISSION") =====
 if (state.view === 'transparency') {
-app.innerHTML = `
-<div style="background: linear-gradient(135deg, var(--blue), #1d4ed8); color: white; padding: 24px; border-radius: 20px; margin: -32px;">
-  <h2 style="color: white; text-align: center; margin-bottom: 24px;">Transparency & Ethics</h2>
+  app.innerHTML = `
+    <h2 class="dashboard-title">Transparency & Ethics</h2>
 
-  <div style="background: rgba(255,255,255,0.15); padding: 16px; border-radius: 12px; margin-bottom: 16px;">
-    <strong>How KS1 Wallet Works</strong><br/>
-    • Self-custodial crypto wallet<br/>
-    • You fully control your private keys<br/>
-    • Runs locally on your device<br/>
-    • No centralized account required<br/>
-    • Built with free and open-source tools
-  </div>
+    <div class="learning-unit">
+      <strong>How KS1 Wallet Works</strong><br/>
+      • Self-custodial crypto wallet<br/>
+      • You fully control your private keys<br/>
+      • Runs locally on your device<br/>
+      • No centralized account required<br/>
+      • Built with free and open-source tools
+    </div>
 
-  <div style="background: rgba(255,255,255,0.15); padding: 16px; border-radius: 12px; margin-bottom: 16px;">
-    <strong>What We NEVER Do</strong><br/>
-    • Store your private keys<br/>
-    • Access your funds<br/>
-    • Track your transactions<br/>
-    • Collect personal data<br/>
-    • Sell your data<br/>
-    • Control or reverse transactions
-  </div>
+    <div class="learning-unit" style="border-left-color: var(--gold);">
+      <strong>What We NEVER Do</strong><br/>
+      • Store your private keys<br/>
+      • Access your funds<br/>
+      • Track your transactions<br/>
+      • Collect personal data<br/>
+      • Sell your data<br/>
+      • Control or reverse transactions
+    </div>
 
-  <div style="background: rgba(255,255,255,0.15); padding: 16px; border-radius: 12px; margin-bottom: 16px;">
-    <strong>What You Control</strong><br/>
-    • Your private keys<br/>
-    • Your wallet access<br/>
-    • Your funds<br/>
-    • Your transaction decisions
-  </div>
+    <div class="learning-unit">
+      <strong>What You Control</strong><br/>
+      • Your private keys<br/>
+      • Your wallet access<br/>
+      • Your funds<br/>
+      • Your transaction decisions
+    </div>
 
-  <div style="background: rgba(212, 175, 55, 0.3); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
-    <strong>Nonprofit & Ethics Statement</strong><br/>
-    KS1 Wallet is built under a nonprofit mission.<br/>
-    Our goal is financial education, digital freedom,<br/>
-    and ethical access to blockchain technology.
-  </div>
+    <div class="learning-unit" style="background: rgba(212, 175, 55, 0.1); border-left-color: var(--gold);">
+      <strong>Nonprofit & Ethics Statement</strong><br/>
+      KS1 Wallet is built under a nonprofit mission.<br/>
+      Our goal is financial education, digital freedom,<br/>
+      and ethical access to blockchain technology.
+    </div>
 
-  <button class="btn btn-secondary" onclick="goHome()" style="margin-top:10px; background: white; color: var(--blue);">
-    Back to Home
-  </button>
-</div>
-`;
-return;
+    <button class="btn btn-primary" onclick="goHome()" style="margin-top:20px;">Back to Home</button>
+  `;
+  return;
 }
 if (state.view === 'legacy') {
 app.innerHTML = `

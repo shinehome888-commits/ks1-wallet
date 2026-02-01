@@ -181,6 +181,7 @@ border-radius: 8px;
 font-family: monospace;
 font-size: 0.95rem;
 border: 1px solid rgba(212, 175, 55, 0.3);
+cursor: pointer;
 }
 .tooltip {
 position: relative;
@@ -551,6 +552,8 @@ address: '',
 balance: '...',
 selectedNetworkId: 1,
 error: '',
+isBalanceHidden: false,
+isAddressVisible: false,
 usdValue: '...'
 };
 function getCurrentNetwork() {
@@ -760,8 +763,9 @@ const balanceDisplay = isBitcoin
 ? `${parseFloat(state.balance).toFixed(8)} BTC`
 : `${parseFloat(state.balance).toFixed(4)} ${currentNetwork.symbol}`;
 
-// Fetch USD value
-let usdDisplay = `≈ $${state.usdValue || '...'} USD`;
+// Toggle visibility
+const displayedBalance = state.isBalanceHidden ? '•••• ••••' : balanceDisplay;
+const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'} USD`;
 
 let networkSelector = '';
 if (!isBitcoin) {
@@ -779,6 +783,13 @@ ${evmOptions}
 `;
 }
 
+// Address display (only when visible)
+const addressSection = state.isAddressVisible
+? `<div style="text-align:center; margin:16px 0;">
+     <code onclick="copy('${state.address}')">${state.address}</code>
+   </div>`
+: '';
+
 const learning = LEARNING_UNITS[currentLearningIndex];
 app.innerHTML = `
 <h2 class="dashboard-title">Dashboard</h2>
@@ -787,16 +798,18 @@ ${networkSelector}
 
 <div style="margin: 20px 0; text-align:center;">
 <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">${currentNetwork.name} (${currentNetwork.symbol})</label>
-<div style="font-size:1.8rem; font-weight:700; color:var(--gold);">${balanceDisplay}</div>
-<div style="color:#94a3b8; font-size:0.95rem; margin-top:6px;">${usdDisplay}</div>
+<div style="font-size:1.8rem; font-weight:700; color:var(--gold); display:flex; align-items:center; justify-content:center;">
+${displayedBalance}
+<button class="toggle-balance" onclick="toggleBalanceVisibility()" style="background:none; border:none; color:var(--gold); font-size:1.4rem; margin-left:8px;">👁️</button>
+</div>
+<div style="color:#94a3b8; font-size:0.95rem; margin-top:6px;">${displayedUSD}</div>
 </div>
 
-<div style="background:rgba(30,41,59,0.7); border-radius:12px; padding:16px; margin:24px 0;">
-<div style="display:flex; justify-content:space-between; align-items:center;">
-<code>${state.address.slice(0,6)}...${state.address.slice(-4)}</code>
-<button onclick="copy('${state.address}')" style="background:none; border:none; color:var(--gold); font-size:1.2rem;">📋</button>
-</div>
-</div>
+<button class="btn btn-primary" onclick="toggleAddressVisibility()" style="margin:10px 0;">
+${state.isAddressVisible ? 'Hide Wallet Address' : 'Show Wallet Address'}
+</button>
+
+${addressSection}
 
 <div class="flex">
 <button class="btn btn-primary" onclick="goSend()">Send</button>
@@ -927,6 +940,15 @@ app.innerHTML = `
 `;
 return;
 }
+}
+// ===== NEW TOGGLE FUNCTIONS =====
+function toggleBalanceVisibility() {
+state.isBalanceHidden = !state.isBalanceHidden;
+render();
+}
+function toggleAddressVisibility() {
+state.isAddressVisible = !state.isAddressVisible;
+render();
 }
 // ===== ACTIONS =====
 function goHome() {
@@ -1204,6 +1226,8 @@ window.handleSend = handleSend;
 window.handleSendConfirm = handleSendConfirm;
 window.copy = copy;
 window.handleUnlock = handleUnlock;
+window.toggleBalanceVisibility = toggleBalanceVisibility;
+window.toggleAddressVisibility = toggleAddressVisibility;
 // Initialize
 createWatermarks();
 render();

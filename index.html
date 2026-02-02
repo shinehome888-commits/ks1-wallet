@@ -34,6 +34,19 @@ min-height: 100vh;
 position: relative;
 overflow-x: hidden;
 }
+/* Seed Phrase Warning Banner */
+.seed-phrase-warning {
+background: linear-gradient(135deg, #1e40af, #1d4ed8);
+color: white;
+padding: 12px 16px;
+text-align: center;
+font-weight: 700;
+font-size: 0.95rem;
+letter-spacing: 0.3px;
+box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+border-bottom: 2px solid #3b82f6;
+z-index: 90;
+}
 .watermark-container {
 position: fixed;
 top: 0;
@@ -261,13 +274,43 @@ font-size: 1.2rem;
 </style>
 </head>
 <body>
+<!-- Seed Phrase Warning Banner -->
+<div class="seed-phrase-warning" id="seedWarningBanner">
+⚠️ KS1 Wallet will never ask you for your seed phrase. Never share it with anyone.
+</div>
+
 <div class="watermark-container" id="watermarkContainer"></div>
 <div class="content">
 <div class="card" id="app"></div>
 </div>
-<!-- Professional Footer -->
+<!-- ProfessionalFooter -->
 <div class="footer">© 2026 KS1 Wallet — A nonprofit project by KS1 Empire Group & Foundation {KS1EGF}</div>
 <script>
+// ===== PHISHING DETECTION =====
+(function() {
+  const officialDomain = 'ks1-wallet.pages.dev';
+  const currentHost = window.location.hostname;
+  
+  if (currentHost !== officialDomain) {
+    const phishingDiv = document.createElement('div');
+    phishingDiv.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: #ef4444;
+      color: white;
+      padding: 12px;
+      text-align: center;
+      font-weight: bold;
+      z-index: 1000;
+      font-size: 0.9rem;
+    `;
+    phishingDiv.textContent = `⚠️ WARNING: This is NOT the official KS1 Wallet. Only use https://${officialDomain}`;
+    document.body.insertBefore(phishingDiv, document.body.firstChild);
+  }
+})();
+
 // ===== BITCOIN WALLET CREATION (WORKING FIX) =====
 function createBitcoinWallet() {
 const mnemonic = bip39.generateMnemonic(128);
@@ -561,6 +604,13 @@ return SUPPORTED_NETWORKS.find(n => n.id === state.selectedNetworkId);
 function render() {
 const app = document.getElementById('app');
 app.innerHTML = '';
+
+// Hide seed phrase warning except on landing
+const warningBanner = document.getElementById('seedWarningBanner');
+if (warningBanner) {
+  warningBanner.style.display = (state.view === 'landing') ? 'block' : 'none';
+}
+
 if (state.view === 'landing') {
 stopInactivityListener();
 stopLearningRotation();
@@ -1074,213 +1124,4 @@ console.error('Bitcoin wallet error:', err);
 state.error = 'Failed to create Bitcoin wallet. Please try again.';
 render();
 }
-} else {
-const wallet = ethers.Wallet.createRandom();
-const mnemonic = wallet.mnemonic.phrase;
-await wallet.encrypt(pwd).then(json => saveWallet(json));
-state.mnemonic = mnemonic;
-state.selectedNetworkId = selectedNetwork.id;
-state.view = 'show-mnemonic';
-render();
 }
-}
-function handleConfirmMnemonic() {
-state.view = 'confirm-mnemonic';
-render();
-}
-function handleConfirmWords() {
-const words = state.mnemonic.split(' ');
-const w3 = document.getElementById('word3').value.trim().toLowerCase();
-const w6 = document.getElementById('word6').value.trim().toLowerCase();
-const w10 = document.getElementById('word10').value.trim().toLowerCase();
-if (w3 === words[2] && w6 === words[5] && w10 === words[9]) {
-const currentNetwork = getCurrentNetwork();
-if (currentNetwork.type === 'bitcoin') {
-state.view = 'dashboard';
-fetchBalance();
-render();
-} else {
-state.view = 'dashboard';
-state.wallet = ethers.Wallet.fromPhrase(state.mnemonic);
-state.address = state.wallet.address;
-fetchBalance();
-render();
-}
-} else {
-state.error = 'Incorrect words. Try again.';
-render();
-}
-}
-function handleImport() {
-state.view = 'import';
-state.error = '';
-render();
-}
-async function handleImportSubmit() {
-const seed = document.getElementById('import-seed').value.trim();
-const pwd = document.getElementById('import-pwd').value;
-const networkId = document.getElementById('import-network').value;
-const selectedNetwork = SUPPORTED_NETWORKS.find(n => String(n.id) === networkId);
-if (pwd.length < 8) {
-state.error = 'Password must be 8+ characters';
-render();
-return;
-}
-if (selectedNetwork.type === 'bitcoin') {
-try {
-if (!bip39.validateMnemonic(seed)) {
-throw new Error('Invalid');
-}
-const address = deriveBitcoinAddressFromMnemonic(seed);
-state.address = address;
-state.selectedNetworkId = 'bitcoin';
-state.view = 'dashboard';
-fetchBalance();
-render();
-} catch {
-state.error = 'Invalid Bitcoin seed phrase';
-render();
-}
-} else {
-try {
-const wallet = ethers.Wallet.fromPhrase(seed);
-await wallet.encrypt(pwd).then(json => saveWallet(json));
-state.wallet = wallet;
-state.address = wallet.address;
-state.selectedNetworkId = selectedNetwork.id;
-state.view = 'dashboard';
-fetchBalance();
-render();
-} catch {
-state.error = 'Invalid seed phrase';
-render();
-}
-}
-}
-async function fetchBalance() {
-state.balance = 'Loading...';
-render();
-const currentNetwork = getCurrentNetwork();
-let balanceNum = 0;
-if (currentNetwork.type === 'bitcoin') {
-balanceNum = await getBitcoinBalance(state.address);
-state.balance = balanceNum;
-} else {
-const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
-const bal = await provider.getBalance(state.address);
-balanceNum = parseFloat(ethers.formatEther(bal));
-state.balance = balanceNum;
-}
-
-// Fetch USD value
-let symbol = '';
-if (currentNetwork.id === 1) symbol = 'ethereum';
-else if (currentNetwork.id === 56) symbol = 'binancecoin';
-else if (currentNetwork.id === 137) symbol = 'matic-network';
-else if (currentNetwork.id === 'bitcoin') symbol = 'bitcoin';
-
-if (symbol) {
-try {
-const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${symbol}&vs_currencies=usd`);
-const data = await res.json();
-const usdPrice = data[symbol]?.usd || 0;
-state.usdValue = (balanceNum * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-} catch (e) {
-state.usdValue = 'N/A';
-}
-} else {
-state.usdValue = 'N/A';
-}
-
-render();
-}
-async function handleSend() {
-const to = document.getElementById('send-to').value;
-const amount = document.getElementById('send-amount').value;
-const currentNetwork = getCurrentNetwork();
-const isBitcoin = currentNetwork.type === 'bitcoin';
-if (isBitcoin) {
-if (!isValidBitcoinAddress(to)) {
-showGuardianWarning('wrongNetwork');
-state.error = 'Invalid Bitcoin address (must start with bc1)';
-render();
-return;
-}
-} else {
-if (!ethers.isAddress(to)) {
-state.error = 'Invalid Ethereum address';
-render();
-return;
-}
-}
-if (!amount || parseFloat(amount) <= 0) {
-state.error = 'Enter a valid amount';
-render();
-return;
-}
-showGuardianWarning('send');
-state.sendTo = to;
-state.sendAmount = amount;
-state.view = 'send-confirm';
-render();
-}
-async function handleSendConfirm() {
-const pwd = document.getElementById('send-pwd').value;
-const currentNetwork = getCurrentNetwork();
-const isBitcoin = currentNetwork.type === 'bitcoin';
-if (isBitcoin) {
-const uri = sendBitcoinURI(state.sendTo, state.sendAmount);
-window.location.href = uri;
-setTimeout(() => {
-state.view = 'send-success';
-render();
-}, 1000);
-} else {
-const wallet = await loadWallet(pwd);
-if (!wallet) {
-alert('❌ Invalid password');
-return;
-}
-try {
-const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
-const signer = wallet.connect(provider);
-const tx = await signer.sendTransaction({
-to: state.sendTo,
-value: ethers.parseEther(state.sendAmount)
-});
-await tx.wait();
-state.txHash = tx.hash;
-state.view = 'send-success';
-render();
-} catch (err) {
-alert('Transaction failed: ' + (err.reason || err.message));
-goSend();
-}
-}
-}
-// Expose to global scope
-window.handleCreate = handleCreate;
-window.handleImport = handleImport;
-window.goHome = goHome;
-window.goDashboard = goDashboard;
-window.goSend = goSend;
-window.goReceive = goReceive;
-window.goImpact = goImpact;
-window.goLegacy = goLegacy;
-window.goTransparency = goTransparency;
-window.handleCreateSubmit = handleCreateSubmit;
-window.handleConfirmMnemonic = handleConfirmMnemonic;
-window.handleConfirmWords = handleConfirmWords;
-window.handleImportSubmit = handleImportSubmit;
-window.handleSend = handleSend;
-window.handleSendConfirm = handleSendConfirm;
-window.copy = copy;
-window.handleUnlock = handleUnlock;
-window.toggleBalanceVisibility = toggleBalanceVisibility;
-window.toggleAddressVisibility = toggleAddressVisibility;
-// Initialize
-createWatermarks();
-render();
-</script>
-</body>
-</html>

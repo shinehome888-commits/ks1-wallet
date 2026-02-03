@@ -441,7 +441,8 @@ bridge: "Cross-chain bridges are high-risk. Use only well-audited, established o
 airdrop: "“Free token” scams steal funds. Never sign transactions for unknown airdrops."
 };
 if (warnings[type]) {
-alert(`⚠️ Safety Reminder:\n${warnings[type]}`);
+alert(`⚠️ Safety Reminder:
+${warnings[type]}`);
 }
 }
 // ===== NETWORK REGISTRY =====
@@ -551,8 +552,7 @@ balance: '...',
 selectedNetworkId: 1,
 error: '',
 isBalanceHidden: false,
-isAddressVisible: false,
-usdValue: '...'
+isAddressVisible: false
 };
 function getCurrentNetwork() {
 return SUPPORTED_NETWORKS.find(n => n.id === state.selectedNetworkId);
@@ -634,41 +634,46 @@ return;
 }
 // ===== TRANSPARENCY VIEW (MATCHES "OUR MISSION") =====
 if (state.view === 'transparency') {
-app.innerHTML = `
-<h2 class="dashboard-title">Transparency & Ethics</h2>
-<div class="learning-unit">
-<strong>How KS1 Wallet Works</strong><br/>
-• Self-custodial crypto wallet<br/>
-• You fully control your private keys<br/>
-• Runs locally on your device<br/>
-• No centralized account required<br/>
-• Built with free and open-source tools
-</div>
-<div class="learning-unit" style="border-left-color: var(--gold);">
-<strong>What We NEVER Do</strong><br/>
-• Store your private keys<br/>
-• Access your funds<br/>
-• Track your transactions<br/>
-• Collect personal data<br/>
-• Sell your data<br/>
-• Control or reverse transactions
-</div>
-<div class="learning-unit">
-<strong>What You Control</strong><br/>
-• Your private keys<br/>
-• Your wallet access<br/>
-• Your funds<br/>
-• Your transaction decisions
-</div>
-<div class="learning-unit" style="background: rgba(212, 175, 55, 0.1); border-left-color: var(--gold);">
-<strong>Nonprofit & Ethics Statement</strong><br/>
-KS1 Wallet is built under a nonprofit mission.<br/>
-Our goal is financial education, digital freedom,<br/>
-and ethical access to blockchain technology.
-</div>
-<button class="btn btn-primary" onclick="goHome()" style="margin-top:20px;">Back to Home</button>
-`;
-return;
+  app.innerHTML = `
+    <h2 class="dashboard-title">Transparency & Ethics</h2>
+
+    <div class="learning-unit">
+      <strong>How KS1 Wallet Works</strong><br/>
+      • Self-custodial crypto wallet<br/>
+      • You fully control your private keys<br/>
+      • Runs locally on your device<br/>
+      • No centralized account required<br/>
+      • Built with free and open-source tools
+    </div>
+
+    <div class="learning-unit" style="border-left-color: var(--gold);">
+      <strong>What We NEVER Do</strong><br/>
+      • Store your private keys<br/>
+      • Access your funds<br/>
+      • Track your transactions<br/>
+      • Collect personal data<br/>
+      • Sell your data<br/>
+      • Control or reverse transactions
+    </div>
+
+    <div class="learning-unit">
+      <strong>What You Control</strong><br/>
+      • Your private keys<br/>
+      • Your wallet access<br/>
+      • Your funds<br/>
+      • Your transaction decisions
+    </div>
+
+    <div class="learning-unit" style="background: rgba(212, 175, 55, 0.1); border-left-color: var(--gold);">
+      <strong>Nonprofit & Ethics Statement</strong><br/>
+      KS1 Wallet is built under a nonprofit mission.<br/>
+      Our goal is financial education, digital freedom,<br/>
+      and ethical access to blockchain technology.
+    </div>
+
+    <button class="btn btn-primary" onclick="goHome()" style="margin-top:20px;">Back to Home</button>
+  `;
+  return;
 }
 if (state.view === 'legacy') {
 app.innerHTML = `
@@ -802,7 +807,7 @@ const balanceDisplay = isBitcoin
 
 // Balance visibility toggle
 const displayedBalance = state.isBalanceHidden ? '•••• ••••' : balanceDisplay;
-const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'}`;
+const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'} USD`;
 
 let networkSelector = '';
 if (!isBitcoin) {
@@ -837,9 +842,7 @@ ${networkSelector}
 <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">${currentNetwork.name} (${currentNetwork.symbol})</label>
 <div style="font-size:1.8rem; font-weight:700; color:var(--gold); display:flex; align-items:center; justify-content:center;">
 ${displayedBalance}
-<button onclick="toggleBalanceVisibility()" style="background:none; border:none; color:var(--gold); font-size:1.4rem; margin-left:8px;">
-${state.isBalanceHidden ? '🙈' : '👁️'}
-</button>
+<button onclick="toggleBalanceVisibility()" style="background:none; border:none; color:var(--gold); font-size:1.4rem; margin-left:8px;">👁️</button>
 </div>
 <div style="color:#94a3b8; font-size:0.95rem; margin-top:6px;">${displayedUSD}</div>
 </div>
@@ -876,7 +879,7 @@ Why do I pay gas fees?
 `}
 
 <div class="learning-unit">
-<strong>ShineGPT:</strong> ${learning.q}<br/>
+<strong>Learn:</strong> ${learning.q}<br/>
 ${learning.a}
 </div>
 `;
@@ -1126,4 +1129,158 @@ return;
 if (selectedNetwork.type === 'bitcoin') {
 try {
 if (!bip39.validateMnemonic(seed)) {
-throw new Error('Invalid
+throw new Error('Invalid');
+}
+const address = deriveBitcoinAddressFromMnemonic(seed);
+state.address = address;
+state.selectedNetworkId = 'bitcoin';
+state.view = 'dashboard';
+fetchBalance();
+render();
+} catch {
+state.error = 'Invalid Bitcoin seed phrase';
+render();
+}
+} else {
+try {
+const wallet = ethers.Wallet.fromPhrase(seed);
+await wallet.encrypt(pwd).then(json => saveWallet(json));
+state.wallet = wallet;
+state.address = wallet.address;
+state.selectedNetworkId = selectedNetwork.id;
+state.view = 'dashboard';
+fetchBalance();
+render();
+} catch {
+state.error = 'Invalid seed phrase';
+render();
+}
+}
+}
+async function fetchBalance() {
+state.balance = 'Loading...';
+render();
+const currentNetwork = getCurrentNetwork();
+let balanceNum = 0;
+if (currentNetwork.type === 'bitcoin') {
+balanceNum = await getBitcoinBalance(state.address);
+state.balance = balanceNum;
+} else {
+const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
+const bal = await provider.getBalance(state.address);
+balanceNum = parseFloat(ethers.formatEther(bal));
+state.balance = balanceNum;
+}
+
+// Fetch USD value
+let symbol = '';
+if (currentNetwork.id === 1) symbol = 'ethereum';
+else if (currentNetwork.id === 56) symbol = 'binancecoin';
+else if (currentNetwork.id === 137) symbol = 'matic-network';
+else if (currentNetwork.id === 'bitcoin') symbol = 'bitcoin';
+
+if (symbol) {
+try {
+const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${symbol}&vs_currencies=usd`);
+const data = await res.json();
+const usdPrice = data[symbol]?.usd || 0;
+state.usdValue = (balanceNum * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+} catch (e) {
+state.usdValue = 'N/A';
+}
+} else {
+state.usdValue = 'N/A';
+}
+
+render();
+}
+async function handleSend() {
+const to = document.getElementById('send-to').value;
+const amount = document.getElementById('send-amount').value;
+const currentNetwork = getCurrentNetwork();
+const isBitcoin = currentNetwork.type === 'bitcoin';
+if (isBitcoin) {
+if (!isValidBitcoinAddress(to)) {
+showGuardianWarning('wrongNetwork');
+state.error = 'Invalid Bitcoin address (must start with bc1)';
+render();
+return;
+}
+} else {
+if (!ethers.isAddress(to)) {
+state.error = 'Invalid Ethereum address';
+render();
+return;
+}
+}
+if (!amount || parseFloat(amount) <= 0) {
+state.error = 'Enter a valid amount';
+render();
+return;
+}
+showGuardianWarning('send');
+state.sendTo = to;
+state.sendAmount = amount;
+state.view = 'send-confirm';
+render();
+}
+async function handleSendConfirm() {
+const pwd = document.getElementById('send-pwd').value;
+const currentNetwork = getCurrentNetwork();
+const isBitcoin = currentNetwork.type === 'bitcoin';
+if (isBitcoin) {
+const uri = sendBitcoinURI(state.sendTo, state.sendAmount);
+window.location.href = uri;
+setTimeout(() => {
+state.view = 'send-success';
+render();
+}, 1000);
+} else {
+const wallet = await loadWallet(pwd);
+if (!wallet) {
+alert('❌ Invalid password');
+return;
+}
+try {
+const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
+const signer = wallet.connect(provider);
+const tx = await signer.sendTransaction({
+to: state.sendTo,
+value: ethers.parseEther(state.sendAmount)
+});
+await tx.wait();
+state.txHash = tx.hash;
+state.view = 'send-success';
+render();
+} catch (err) {
+alert('Transaction failed: ' + (err.reason || err.message));
+goSend();
+}
+}
+}
+// Expose to global scope
+window.handleCreate = handleCreate;
+window.handleImport = handleImport;
+window.goHome = goHome;
+window.goDashboard = goDashboard;
+window.goSend = goSend;
+window.goReceive = goReceive;
+window.goImpact = goImpact;
+window.goLegacy = goLegacy;
+window.goTransparency = goTransparency;
+window.handleCreateSubmit = handleCreateSubmit;
+window.handleConfirmMnemonic = handleConfirmMnemonic;
+window.handleConfirmWords = handleConfirmWords;
+window.handleImportSubmit = handleImportSubmit;
+window.handleSend = handleSend;
+window.handleSendConfirm = handleSendConfirm;
+window.copy = copy;
+window.handleUnlock = handleUnlock;
+window.toggleBalanceVisibility = toggleBalanceVisibility;
+window.toggleAddressVisibility = toggleAddressVisibility;
+// Initialize
+createWatermarks();
+render();
+</script>
+</body>
+</html>

@@ -441,8 +441,7 @@ bridge: "Cross-chain bridges are high-risk. Use only well-audited, established o
 airdrop: "“Free token” scams steal funds. Never sign transactions for unknown airdrops."
 };
 if (warnings[type]) {
-alert(`⚠️ Safety Reminder:
-${warnings[type]}`);
+alert(`⚠️ Safety Reminder:\n${warnings[type]}`);
 }
 }
 // ===== NETWORK REGISTRY =====
@@ -552,7 +551,8 @@ balance: '...',
 selectedNetworkId: 1,
 error: '',
 isBalanceHidden: false,
-isAddressVisible: false
+isAddressVisible: false,
+usdValue: '...'
 };
 function getCurrentNetwork() {
 return SUPPORTED_NETWORKS.find(n => n.id === state.selectedNetworkId);
@@ -802,7 +802,7 @@ const balanceDisplay = isBitcoin
 
 // Balance visibility toggle
 const displayedBalance = state.isBalanceHidden ? '•••• ••••' : balanceDisplay;
-const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'} USD`;
+const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'}`;
 
 let networkSelector = '';
 if (!isBitcoin) {
@@ -1126,6 +1126,4 @@ return;
 if (selectedNetwork.type === 'bitcoin') {
 try {
 if (!bip39.validateMnemonic(seed)) {
-throw new Error('Invalid');
-}
-const address
+throw new Error('Invalid

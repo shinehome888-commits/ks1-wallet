@@ -1128,11 +1128,4 @@ try {
 if (!bip39.validateMnemonic(seed)) {
 throw new Error('Invalid');
 }
-const address = deriveBitcoinAddressFromMnemonic(seed);
-state.address = address;
-state.selectedNetworkId = 'bitcoin';
-state.view = 'dashboard';
-fetchBalance();
-render();
-} catch {
-state.error = 'Invalid Bitcoin seed phrase';
+const address

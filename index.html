@@ -1125,19 +1125,4 @@ return;
 }
 if (selectedNetwork.type === 'bitcoin') {
 try {
-if (!bip39.validateMnemonic(seed)) {
-throw new Error('Invalid');
-}
-const address = deriveBitcoinAddressFromMnemonic(seed);
-state.address = address;
-state.selectedNetworkId = 'bitcoin';
-state.view = 'dashboard';
-fetchBalance();
-render();
-} catch {
-state.error = 'Invalid Bitcoin seed phrase';
-render();
-}
-} else {
-try {
-const wallet = ethers.Wallet.fromPhrase(seed
+if (!bip39.validateMnemonic(seed

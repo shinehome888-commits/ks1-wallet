@@ -6,7 +6,7 @@
 <title>KS1 Wallet</title>
 <!-- EVM Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
-<!-- Bitcoin Libraries (FIXED) -->
+<!-- Bitcoin Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.0/dist/bitcoinjs-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bip39@3.0.4/browser/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
@@ -268,7 +268,7 @@ font-size: 1.2rem;
 <!-- Professional Footer -->
 <div class="footer">© 2026 KS1 Wallet — A nonprofit project by KS1 Empire Group & Foundation {KS1EGF}</div>
 <script>
-// ===== BITCOIN WALLET CREATION (WORKING FIX) =====
+// ===== BITCOIN WALLET CREATION =====
 function createBitcoinWallet() {
 const mnemonic = bip39.generateMnemonic(128);
 const seed = bip39.mnemonicToSeedSync(mnemonic);
@@ -632,7 +632,7 @@ Building tools for the 4th Industrial Revolution—where AI, blockchain, and hum
 `;
 return;
 }
-// ===== TRANSPARENCY VIEW (MATCHES "OUR MISSION") =====
+// ===== TRANSPARENCY VIEW =====
 if (state.view === 'transparency') {
 app.innerHTML = `
 <h2 class="dashboard-title">Transparency & Ethics</h2>
@@ -983,7 +983,7 @@ app.innerHTML = `
 return;
 }
 }
-// ===== NEW TOGGLE FUNCTIONS =====
+// ===== TOGGLE FUNCTIONS =====
 function toggleBalanceVisibility() {
 state.isBalanceHidden = !state.isBalanceHidden;
 render();
@@ -1125,4 +1125,5 @@ return;
 }
 if (selectedNetwork.type === 'bitcoin') {
 try {
-if (!bip39.validateMnemonic(seed
+if (!bip39.validateMnemonic(seed)) {
+throw new

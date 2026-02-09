@@ -6,7 +6,7 @@
 <title>KS1 Wallet</title>
 <!-- EVM Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
-<!-- Bitcoin Libraries (FIXED) -->
+<!-- Bitcoin Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.0/dist/bitcoinjs-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bip39@3.0.4/browser/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
@@ -265,10 +265,9 @@ font-size: 1.2rem;
 <div class="content">
 <div class="card" id="app"></div>
 </div>
-<!-- Professional Footer -->
 <div class="footer">© 2026 KS1 Wallet — A nonprofit project by KS1 Empire Group & Foundation {KS1EGF}</div>
 <script>
-// ===== BITCOIN WALLET CREATION (WORKING FIX) =====
+// ===== BITCOIN WALLET CREATION =====
 function createBitcoinWallet() {
 const mnemonic = bip39.generateMnemonic(128);
 const seed = bip39.mnemonicToSeedSync(mnemonic);
@@ -632,7 +631,7 @@ Building tools for the 4th Industrial Revolution—where AI, blockchain, and hum
 `;
 return;
 }
-// ===== TRANSPARENCY VIEW (MATCHES "OUR MISSION") =====
+// ===== TRANSPARENCY VIEW =====
 if (state.view === 'transparency') {
 app.innerHTML = `
 <h2 class="dashboard-title">Transparency & Ethics</h2>
@@ -799,7 +798,6 @@ const isBitcoin = currentNetwork.type === 'bitcoin';
 const balanceDisplay = isBitcoin
 ? `${parseFloat(state.balance).toFixed(8)} BTC`
 : `${parseFloat(state.balance).toFixed(4)} ${currentNetwork.symbol}`;
-// Balance visibility toggle
 const displayedBalance = state.isBalanceHidden ? '•••• ••••' : balanceDisplay;
 const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'}`;
 let networkSelector = '';
@@ -817,11 +815,8 @@ ${evmOptions}
 </div>
 `;
 }
-// Address visibility toggle
 const addressSection = state.isAddressVisible
-? `<div style="text-align:center; margin:16px 0;">
-     <code onclick="copy('${state.address}')">${state.address}</code>
-   </div>`
+? `<div style="text-align:center; margin:16px 0;"><code onclick="copy('${state.address}')">${state.address}</code></div>`
 : '';
 const learning = LEARNING_UNITS[currentLearningIndex];
 app.innerHTML = `
@@ -845,7 +840,7 @@ ${addressSection}
 </div>
 <button class="btn btn-primary" onclick="goLegacy()" style="margin-top:15px;">Legacy Planning</button>
 <a href="https://shinegpt.pages.dev/" target="_blank" class="btn btn-primary" style="margin-top:10px; text-decoration: none; display: flex; justify-content: center; align-items: center;">
-  ✨ Learn with ShineGPT
+✨ Learn with ShineGPT
 </a>
 ${isBitcoin ? `
 <div class="bitcoin-education">
@@ -968,7 +963,7 @@ app.innerHTML = `
 return;
 }
 }
-// ===== NEW TOGGLE FUNCTIONS =====
+// ===== TOGGLES =====
 function toggleBalanceVisibility() {
 state.isBalanceHidden = !state.isBalanceHidden;
 render();
@@ -978,44 +973,16 @@ state.isAddressVisible = !state.isAddressVisible;
 render();
 }
 // ===== ACTIONS =====
-function goHome() {
-state.view = 'landing';
-state.error = '';
-render();
-}
-function goDashboard() {
-state.view = 'dashboard';
-state.error = '';
-render();
-}
-function goSend() {
-state.view = 'send';
-state.error = '';
-render();
-}
-function goReceive() {
-state.view = 'receive';
-render();
-}
-function goImpact() {
-state.view = 'impact';
-render();
-}
-function goLegacy() {
-state.view = 'legacy';
-render();
-}
-function goTransparency() {
-state.view = 'transparency';
-render();
-}
+function goHome() { state.view = 'landing'; state.error = ''; render(); }
+function goDashboard() { state.view = 'dashboard'; state.error = ''; render(); }
+function goSend() { state.view = 'send'; state.error = ''; render(); }
+function goReceive() { state.view = 'receive'; render(); }
+function goImpact() { state.view = 'impact'; render(); }
+function goLegacy() { state.view = 'legacy'; render(); }
+function goTransparency() { state.view = 'transparency'; render(); }
 async function handleUnlock() {
 const pwd = document.getElementById('unlock-pwd').value;
-if (!pwd) {
-state.error = 'Please enter your wallet password';
-render();
-return;
-}
+if (!pwd) { state.error = 'Please enter your wallet password'; render(); return; }
 const wallet = await loadWallet(pwd);
 if (wallet) {
 state.wallet = wallet;
@@ -1029,20 +996,12 @@ state.error = 'Incorrect password. Please try again.';
 render();
 }
 }
-function handleCreate() {
-state.view = 'create';
-state.error = '';
-render();
-}
+function handleCreate() { state.view = 'create'; state.error = ''; render(); }
 async function handleCreateSubmit() {
 const pwd = document.getElementById('create-pwd').value;
 const networkId = document.getElementById('create-network').value;
 const selectedNetwork = SUPPORTED_NETWORKS.find(n => String(n.id) === networkId);
-if (pwd.length < 8) {
-state.error = 'Password must be at least 8 characters';
-render();
-return;
-}
+if (pwd.length < 8) { state.error = 'Password must be at least 8 characters'; render(); return; }
 if (selectedNetwork.type === 'bitcoin') {
 try {
 const { mnemonic, address } = createBitcoinWallet();
@@ -1066,10 +1025,7 @@ state.view = 'show-mnemonic';
 render();
 }
 }
-function handleConfirmMnemonic() {
-state.view = 'confirm-mnemonic';
-render();
-}
+function handleConfirmMnemonic() { state.view = 'confirm-mnemonic'; render(); }
 function handleConfirmWords() {
 const words = state.mnemonic.split(' ');
 const w3 = document.getElementById('word3').value.trim().toLowerCase();
@@ -1093,51 +1049,17 @@ state.error = 'Incorrect words. Try again.';
 render();
 }
 }
-function handleImport() {
-state.view = 'import';
-state.error = '';
-render();
-}
+function handleImport() { state.view = 'import'; state.error = ''; render(); }
 async function handleImportSubmit() {
 const seed = document.getElementById('import-seed').value.trim();
 const pwd = document.getElementById('import-pwd').value;
 const networkId = document.getElementById('import-network').value;
 const selectedNetwork = SUPPORTED_NETWORKS.find(n => String(n.id) === networkId);
-if (pwd.length < 8) {
-state.error = 'Password must be 8+ characters';
-render();
-return;
-}
+if (pwd.length < 8) { state.error = 'Password must be 8+ characters'; render(); return; }
 if (selectedNetwork.type === 'bitcoin') {
 try {
-if (!bip39.validateMnemonic(seed)) {
-throw new Error('Invalid');
-}
+if (!bip39.validateMnemonic(seed)) throw new Error('Invalid');
 const address = deriveBitcoinAddressFromMnemonic(seed);
 state.address = address;
 state.selectedNetworkId = 'bitcoin';
-state.view = 'dashboard';
-fetchBalance();
-render();
-} catch {
-state.error = 'Invalid Bitcoin seed phrase';
-render();
-}
-} else {
-try {
-const wallet = ethers.Wallet.fromPhrase(seed);
-await wallet.encrypt(pwd).then(json => saveWallet(json));
-state.wallet = wallet;
-state.address = wallet.address;
-state.selectedNetworkId = selectedNetwork.id;
-state.view = 'dashboard';
-fetchBalance();
-render();
-} catch {
-state.error = 'Invalid seed phrase';
-render();
-}
-}
-}
-async function fetchBalance() {
-state.balance = 'Loading...';
+state.view = 'dashboard

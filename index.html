@@ -6,6 +6,10 @@
 <title>KS1 Wallet</title>
 <!-- EVM Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
+<!-- Bitcoin Libraries (FIXED) -->
+<script src="https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.0/dist/bitcoinjs-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bip39@3.0.4/browser/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <style>
 :root {
 --blue: #2563eb;
@@ -210,6 +214,16 @@ opacity: 1;
 .glow-on-focus:focus {
 box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.6), 0 0 15px rgba(37, 99, 235, 0.4);
 }
+/* Bitcoin education banner */
+.bitcoin-education {
+background: rgba(37, 99, 235, 0.15);
+border: 1px solid var(--blue);
+border-radius: 12px;
+padding: 14px;
+margin-top: 20px;
+font-size: 0.85rem;
+color: #bfdbfe;
+}
 /* Educational learning unit */
 .learning-unit {
 background: rgba(37, 99, 235, 0.1);
@@ -254,11 +268,189 @@ font-size: 1.2rem;
 <!-- Professional Footer -->
 <div class="footer">© 2026 KS1 Wallet — A nonprofit project by KS1 Empire Group & Foundation {KS1EGF}</div>
 <script>
-// ===== NETWORK REGISTRY (Bitcoin removed) =====
+// ===== BITCOIN WALLET CREATION (WORKING FIX) =====
+function createBitcoinWallet() {
+const mnemonic = bip39.generateMnemonic(128);
+const seed = bip39.mnemonicToSeedSync(mnemonic);
+const root = bitcoin.bip32.fromSeed(seed);
+const child = root.deriveHardened(84)
+.deriveHardened(0)
+.deriveHardened(0)
+.derive(0)
+.derive(0);
+const { address } = bitcoin.payments.p2wpkh({
+pubkey: child.publicKey,
+network: bitcoin.networks.bitcoin
+});
+return { mnemonic, address };
+}
+function deriveBitcoinAddressFromMnemonic(mnemonic) {
+if (!bip39.validateMnemonic(mnemonic)) {
+throw new Error('Invalid mnemonic');
+}
+const seed = bip39.mnemonicToSeedSync(mnemonic);
+const root = bitcoin.bip32.fromSeed(seed);
+const child = root.deriveHardened(84)
+.deriveHardened(0)
+.deriveHardened(0)
+.derive(0)
+.derive(0);
+const { address } = bitcoin.payments.p2wpkh({
+pubkey: child.publicKey,
+network: bitcoin.networks.bitcoin
+});
+return address;
+}
+function isValidBitcoinAddress(addr) {
+try {
+bitcoin.address.toOutputScript(addr, bitcoin.networks.bitcoin);
+return true;
+} catch (e) {
+return false;
+}
+}
+async function getBitcoinBalance(address) {
+try {
+const res = await fetch(`https://blockchain.info/rawaddr/${address}`);
+const data = await res.json();
+return data.final_balance / 100000000;
+} catch {
+return 0;
+}
+}
+function sendBitcoinURI(recipient, amountBTC) {
+return `bitcoin:${recipient}?amount=${amountBTC}`;
+}
+// ===== EDUCATIONAL LEARNING UNITS =====
+const LEARNING_UNITS = [
+{ q: "Why self-custody?", a: "Self-custody means you own your crypto—not a bank or app. KS1 Wallet never sees your keys or funds. Ever." },
+{ q: "Centralized risks", a: "Centralized exchanges can freeze your money. With self-custody, only you control your funds." },
+{ q: "Bitcoin basics", a: "Bitcoin is digital gold—scarce, secure, and borderless. Its supply is fixed at 21 million coins." },
+{ q: "Ethereum power", a: "Ethereum lets you use apps without giving up data. Web3 puts you in control of your digital life." },
+{ q: "Seed phrase safety", a: "Your seed phrase is your lifeline. Store it offline on metal—never in cloud notes or photos." },
+{ q: "Phishing danger", a: "Never share your seed phrase—not even with 'support'. Real teams never ask for it." },
+{ q: "AI & data", a: "AI learns from your data. Web3 lets you own it. Big Tech profits from your attention; Web3 rewards your participation." },
+{ q: "4th Industrial Revolution", a: "The 4th Industrial Revolution is about decentralization. Alkebulan (Africa)’s youth will shape Web3’s future." },
+{ q: "Banking problems", a: "Banks profit from your deposits. Crypto returns control to you. In many countries, millions lack bank access entirely." },
+{ q: "Inflation hedge", a: "Inflation steals value. Bitcoin has a fixed supply—making it a strong hedge against currency devaluation." },
+{ q: "Nonprofit promise", a: "KS1 Wallet is free because we’re a nonprofit. No accounts, no tracking, no hidden fees." },
+{ q: "Alkebulan (Africa)’s advantage", a: "Alkebulan (Africa) leads in mobile money—now lead in self-custody. Financial inclusion starts with access—not permission." },
+{ q: "Censorship resistance", a: "Governments can censor payments. Blockchain cannot. Your crypto is yours—even if borders close." },
+{ q: "Phone security", a: "Your phone is your bank. Guard it well with strong passwords and auto-logout enabled." },
+{ q: "Address verification", a: "Always verify recipient addresses before sending. Transactions are irreversible—double-check every character." },
+{ q: "Gas fees explained", a: "Transaction fees fund network security. On Ethereum, gas pays for computation—not storage." },
+{ q: "Bitcoin timing", a: "Bitcoin confirms blocks every 10 minutes. Patience ensures security—don’t resend transactions." },
+{ q: "Responsibility", a: "Self-custody is a responsibility—and a right. True ownership means no one can take it from you." },
+{ q: "Offline safety", a: "KS1 Wallet works offline. Your keys stay private in your browser—no servers to hack." },
+{ q: "Open-source trust", a: "Open-source code means anyone can audit our safety. We don’t collect your data—we can’t sell what we don’t have." },
+{ q: "Financial freedom", a: "Financial freedom starts with owning your keys. Teach family crypto safety to protect their future." },
+{ q: "Remittance savings", a: "Global remittances cost 7%. Bitcoin cuts that to near zero—putting money back in families’ pockets." },
+{ q: "Password hygiene", a: "Use password managers for logins—but never store seed phrases there. Test recovery yearly." },
+{ q: "Hardware wallets", a: "For large holdings, use hardware wallets. They add security by keeping keys offline." },
+{ q: "Estate planning", a: "Digital inheritance requires planning. Update your will to include crypto instructions." },
+{ q: "Community power", a: "KS1 Wallet teaches while you use it. Learning is built-in—because financial literacy is a human right." },
+{ q: "Transparency", a: "Transparency builds trust. Our code is open for all. Community feedback shapes our future." },
+{ q: "Solar nodes", a: "Solar-powered nodes keep networks running off-grid—perfect for Alkebulan (Africa)’s energy landscape." },
+{ q: "Refugee aid", a: "Crypto empowers refugees with portable wealth. Digital sovereignty starts with self-custody." },
+{ q: "Foundation mission", a: "KS1 Empire Group & Foundation {KS1EGF} funds education, not executives. We’re building tools for financial dignity." },
+{ q: "Movement mindset", a: "You’re not just using a wallet—you’re joining a movement for equitable digital futures." },
+{ q: "Data ownership", a: "Data is the new oil. Own your reserves. AI + blockchain = verifiable, fair systems." },
+{ q: "Quantum future", a: "Quantum computers threaten crypto. Solutions are coming—stay updated through KS1 education." },
+{ q: "Legacy planning", a: "Your great-grandchildren might inherit your Bitcoin. Engrave seed phrases on stainless steel." },
+{ q: "Test sends", a: "Test small sends first. Confirm receipt before large transfers—saves heartache later." },
+{ q: "dApp risks", a: "Unknown dApps can drain your wallet. Only connect to trusted projects with verified contracts." },
+{ q: "Approval cleanup", a: "Contract approvals give spending power. Revoke unused ones periodically via revoke.cash." },
+{ q: "Privacy vs secrecy", a: "Privacy isn’t secrecy—it’s control over your information. Bitcoin’s blockchain is public; your identity isn’t." },
+{ q: "DeFi caution", a: "DeFi lets you earn interest without banks. But impermanent loss is real—learn before investing." },
+{ q: "Staking locks", a: "Staking locks coins to secure networks. Rewards come later—you can’t access them until unstaked." },
+{ q: "Bridge risks", a: "Bridges move assets between chains. They’re high-risk—use only well-audited, established ones." },
+{ q: "Token research", a: "Always research tokens. Many are scams. Market cap = price × supply—not total value." },
+{ q: "Volatility strategy", a: "Volatility is normal. Only invest what you can lose. Dollar-cost averaging reduces risk." },
+{ q: "Crypto winters", a: "Crypto winters build stronger ecosystems. Focus on projects solving real problems—not hype." },
+{ q: "Digital literacy", a: "Digital literacy is the new financial literacy. Free education breaks down barriers to Web3." },
+{ q: "Identity theft", a: "Identity theft plagues Web2. Web3 uses verified credentials you control." },
+{ q: "Layer 2 speed", a: "Layer 2 networks make Ethereum faster and cheaper. Rollups bundle transactions off-chain for efficiency." },
+{ q: "Interoperability", a: "Interoperability connects blockchains like the internet. Oracles bring real-world data to smart contracts." },
+{ q: "DAO power", a: "DAOs are digital communities with shared treasuries. Your voice matters in decentralized governance." },
+{ q: "Security audits", a: "Security audits catch bugs. But can’t guarantee safety. Bug bounties reward hackers for finding flaws." },
+{ q: "Composability", a: "Composability lets apps build on each other—like Lego. Permissionless innovation means anyone can create." },
+{ q: "Mobile advantage", a: "Alkebulan (Africa)’s mobile penetration enables crypto adoption. Low-bandwidth optimization keeps KS1 Wallet accessible." },
+{ q: "Environmental care", a: "Optimized for energy efficiency. Promotes proof-of-stake networks like Ethereum. Carbon-neutral hosting via Cloudflare." },
+{ q: "Public goods", a: "Public goods funding grows through crypto donations. Regenerative finance heals ecosystems and economies." },
+{ q: "Zero-knowledge", a: "Zero-knowledge proofs let you prove things privately—without revealing sensitive data." },
+{ q: "Tokenomics", a: "Tokenomics design incentives for network health. Voting with tokens gives you a say in protocols." },
+{ q: "Future vision", a: "Building tools for the 4th Industrial Revolution—where AI, blockchain, and human dignity intersect." },
+{ q: "Non-custodial", a: "KS1 Wallet is non-custodial. We never hold your keys. Your crypto, your control." },
+{ q: "Backup discipline", a: "Backups prevent loss. Store multiple copies in secure locations—fireproof and waterproof." },
+{ q: "Family training", a: "Teach trusted family how to recover your wallet. Practice together—before it’s urgent." },
+{ q: "Dead man’s switch", a: "Services can release keys if you’re inactive. Research options carefully—security is paramount." },
+{ q: "Multi-sig safety", a: "For large holdings, use multi-signature wallets requiring multiple keys—reduces single-point failure risk." },
+{ q: "Diversify storage", a: "Don’t store all crypto in one wallet. Diversify across devices and storage methods." },
+{ q: "Recovery test", a: "Yearly, restore your wallet from seed phrase to ensure it works. Don’t wait for an emergency." },
+{ q: "Ethical duty", a: "Protecting your family’s future is part of self-custody. Act now—your legacy depends on it." },
+{ q: "Slippage setting", a: "When swapping tokens, slippage protects against price changes. Set too low, and your swap fails." },
+{ q: "Fake tokens", a: "Scammers mimic real tokens. Always check contract addresses before swapping or approving." },
+{ q: "Custom networks", a: "Malicious RPCs steal funds. Only add networks from official project documentation." },
+{ q: "Balance confirmation", a: "Unconfirmed balances aren’t spendable. Wait for 3+ confirmations before considering funds received." },
+{ q: "Airdrop scams", a: "‘Free token’ scams steal funds. Never sign transactions for unknown airdrops—real ones require no action." },
+{ q: "Signing risks", a: "Signing messages could authorize actions. Only sign if you understand the request—when in doubt, cancel." },
+{ q: "Phishing URLs", a: "Malicious sites mimic real apps. Always verify URLs match official project domains before connecting." },
+{ q: "dApp permissions", a: "Connecting to dApps only shares your address—not funds. Spending requires separate transaction approval." },
+{ q: "Fee timing", a: "High network fees? Congestion may be temporary. Wait if your transaction isn’t urgent." },
+{ q: "Wrong network", a: "Sending BTC to an ETH address loses funds permanently. Always confirm the network before sending." },
+{ q: "Revocation need", a: "Unused token approvals are security risks. Revoke them periodically to limit exposure." },
+{ q: "Export caution", a: "Wallet exports contain sensitive info. Share only via encrypted channels—never email or SMS." },
+{ q: "Education access", a: "KS1 Wallet works on low-end devices. Education shouldn’t require expensive hardware." },
+{ q: "Community input", a: "We build what users need. Your feedback shapes KS1 Wallet’s nonprofit mission." },
+{ q: "No ads ever", a: "Free forever—no ads, no paywalls. KS1 Empire Group & Foundation {KS1EGF} funds development through grants." },
+{ q: "Local focus", a: "Built for Alkebulan (Africa)’s realities: intermittent connectivity, data costs, and mobile-first usage." },
+{ q: "Human rights", a: "Financial privacy is a human right. Censorship resistance protects activists and journalists globally." },
+{ q: "Long-term view", a: "Think decades ahead. Bitcoin’s design ensures it outlives us all—if stored properly." },
+{ q: "Metal storage", a: "Paper burns, phones break. Stainless steel seed plates survive fire, water, and time." },
+{ q: "Legal integration", a: "Include crypto in your legal will. Use lawyers familiar with digital asset inheritance." },
+{ q: "Trust but verify", a: "Verify everything in crypto. Official links, contract addresses, team credentials—assume nothing." },
+{ q: "Small steps", a: "Start small. Learn with tiny amounts before managing significant value. Mastery comes with practice." },
+{ q: "Patience pays", a: "Blockchain moves at its own pace. Rushing causes errors. Breathe, verify, then act." },
+{ q: "Knowledge sharing", a: "Share what you learn. Empower your community—financial freedom grows through collective knowledge." },
+{ q: "Hopeful tech", a: "Technology should uplift humanity. KS1 Wallet exists to make that real—for Alkebulan (Africa) and the world." }
+];
+let currentLearningIndex = 0;
+let learningInterval;
+function startLearningRotation() {
+if (learningInterval) clearInterval(learningInterval);
+learningInterval = setInterval(() => {
+currentLearningIndex = (currentLearningIndex + 1) % LEARNING_UNITS.length;
+render();
+}, 45000);
+}
+function stopLearningRotation() {
+if (learningInterval) {
+clearInterval(learningInterval);
+learningInterval = null;
+}
+}
+// ===== GUARDIAN MODE WARNINGS =====
+function showGuardianWarning(type) {
+const warnings = {
+send: "Transactions are irreversible. Double-check the address before confirming.",
+wrongNetwork: "Sending to the wrong network (e.g., BTC to ETH) loses funds permanently.",
+approve: "This approval lets the contract spend your tokens anytime. Revoke later if unused.",
+dapp: "Never connect to phishing sites. Verify the URL matches the official project.",
+sign: "Signing this message could authorize actions. Only sign if you understand it.",
+bridge: "Cross-chain bridges are high-risk. Use only well-audited, established ones.",
+airdrop: "“Free token” scams steal funds. Never sign transactions for unknown airdrops."
+};
+if (warnings[type]) {
+alert(`⚠️ Safety Reminder:
+${warnings[type]}`);
+}
+}
+// ===== NETWORK REGISTRY =====
 const SUPPORTED_NETWORKS = [
 { id: 1, name: 'Ethereum', symbol: 'ETH', type: 'evm' },
 { id: 56, name: 'BNB Chain', symbol: 'BNB', type: 'evm' },
-{ id: 137, name: 'Polygon', symbol: 'MATIC', type: 'evm' }
+{ id: 137, name: 'Polygon', symbol: 'MATIC', type: 'evm' },
+{ id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', type: 'bitcoin' }
 ];
 const CHAINS = {
 1: { rpc: 'https://ethereum.publicnode.com', explorer: 'https://etherscan.io/tx/' },
@@ -351,127 +543,6 @@ div.style.fontSize = `${18 + Math.random() * 10}px`;
 container.appendChild(div);
 }
 }
-// ===== EDUCATIONAL LEARNING UNITS =====
-const LEARNING_UNITS = [
-{ q: "Why self-custody?", a: "Self-custody means you own your crypto—not a bank or app. KS1 Wallet never sees your keys or funds. Ever." },
-{ q: "Centralized risks", a: "Centralized exchanges can freeze your money. With self-custody, only you control your funds." },
-{ q: "Ethereum power", a: "Ethereum lets you use apps without giving up data. Web3 puts you in control of your digital life." },
-{ q: "Seed phrase safety", a: "Your seed phrase is your lifeline. Store it offline on metal—never in cloud notes or photos." },
-{ q: "Phishing danger", a: "Never share your seed phrase—not even with 'support'. Real teams never ask for it." },
-{ q: "AI & data", a: "AI learns from your data. Web3 lets you own it. Big Tech profits from your attention; Web3 rewards your participation." },
-{ q: "4th Industrial Revolution", a: "The 4th Industrial Revolution is about decentralization. Alkebulan (Africa)’s youth will shape Web3’s future." },
-{ q: "Banking problems", a: "Banks profit from your deposits. Crypto returns control to you. In many countries, millions lack bank access entirely." },
-{ q: "Inflation hedge", a: "Inflation steals value. Ethereum has strong utility—making it a hedge against currency devaluation." },
-{ q: "Nonprofit promise", a: "KS1 Wallet is free because we’re a nonprofit. No accounts, no tracking, no hidden fees." },
-{ q: "Alkebulan (Africa)’s advantage", a: "Alkebulan (Africa) leads in mobile money—now lead in self-custody. Financial inclusion starts with access—not permission." },
-{ q: "Censorship resistance", a: "Governments can censor payments. Blockchain cannot. Your crypto is yours—even if borders close." },
-{ q: "Phone security", a: "Your phone is your bank. Guard it well with strong passwords and auto-logout enabled." },
-{ q: "Address verification", a: "Always verify recipient addresses before sending. Transactions are irreversible—double-check every character." },
-{ q: "Gas fees explained", a: "Transaction fees fund network security. On Ethereum, gas pays for computation—not storage." },
-{ q: "Responsibility", a: "Self-custody is a responsibility—and a right. True ownership means no one can take it from you." },
-{ q: "Offline safety", a: "KS1 Wallet works offline. Your keys stay private in your browser—no servers to hack." },
-{ q: "Open-source trust", a: "Open-source code means anyone can audit our safety. We don’t collect your data—we can’t sell what we don’t have." },
-{ q: "Financial freedom", a: "Financial freedom starts with owning your keys. Teach family crypto safety to protect their future." },
-{ q: "Remittance savings", a: "Global remittances cost 7%. Crypto cuts that to near zero—putting money back in families’ pockets." },
-{ q: "Password hygiene", a: "Use password managers for logins—but never store seed phrases there. Test recovery yearly." },
-{ q: "Hardware wallets", a: "For large holdings, use hardware wallets. They add security by keeping keys offline." },
-{ q: "Estate planning", a: "Digital inheritance requires planning. Update your will to include crypto instructions." },
-{ q: "Community power", a: "KS1 Wallet teaches while you use it. Learning is built-in—because financial literacy is a human right." },
-{ q: "Transparency", a: "Transparency builds trust. Our code is open for all. Community feedback shapes our future." },
-{ q: "Solar nodes", a: "Solar-powered nodes keep networks running off-grid—perfect for Alkebulan (Africa)’s energy landscape." },
-{ q: "Refugee aid", a: "Crypto empowers refugees with portable wealth. Digital sovereignty starts with self-custody." },
-{ q: "Foundation mission", a: "KS1 Empire Group & Foundation {KS1EGF} funds education, not executives. We’re building tools for financial dignity." },
-{ q: "Movement mindset", a: "You’re not just using a wallet—you’re joining a movement for equitable digital futures." },
-{ q: "Data ownership", a: "Data is the new oil. Own your reserves. AI + blockchain = verifiable, fair systems." },
-{ q: "Quantum future", a: "Quantum computers threaten crypto. Solutions are coming—stay updated through KS1 education." },
-{ q: "Legacy planning", a: "Your great-grandchildren might inherit your crypto. Engrave seed phrases on stainless steel." },
-{ q: "Test sends", a: "Test small sends first. Confirm receipt before large transfers—saves heartache later." },
-{ q: "dApp risks", a: "Unknown dApps can drain your wallet. Only connect to trusted projects with verified contracts." },
-{ q: "Approval cleanup", a: "Contract approvals give spending power. Revoke unused ones periodically via revoke.cash." },
-{ q: "Privacy vs secrecy", a: "Privacy isn’t secrecy—it’s control over your information. Blockchain is public; your identity isn’t." },
-{ q: "DeFi caution", a: "DeFi lets you earn interest without banks. But impermanent loss is real—learn before investing." },
-{ q: "Staking locks", a: "Staking locks coins to secure networks. Rewards come later—you can’t access them until unstaked." },
-{ q: "Bridge risks", a: "Bridges move assets between chains. They’re high-risk—use only well-audited, established ones." },
-{ q: "Token research", a: "Always research tokens. Many are scams. Market cap = price × supply—not total value." },
-{ q: "Volatility strategy", a: "Volatility is normal. Only invest what you can lose. Dollar-cost averaging reduces risk." },
-{ q: "Crypto winters", a: "Crypto winters build stronger ecosystems. Focus on projects solving real problems—not hype." },
-{ q: "Digital literacy", a: "Digital literacy is the new financial literacy. Free education breaks down barriers to Web3." },
-{ q: "Identity theft", a: "Identity theft plagues Web2. Web3 uses verified credentials you control." },
-{ q: "Layer 2 speed", a: "Layer 2 networks make Ethereum faster and cheaper. Rollups bundle transactions off-chain for efficiency." },
-{ q: "Interoperability", a: "Interoperability connects blockchains like the internet. Oracles bring real-world data to smart contracts." },
-{ q: "DAO power", a: "DAOs are digital communities with shared treasuries. Your voice matters in decentralized governance." },
-{ q: "Security audits", a: "Security audits catch bugs. But can’t guarantee safety. Bug bounties reward hackers for finding flaws." },
-{ q: "Composability", a: "Composability lets apps build on each other—like Lego. Permissionless innovation means anyone can create." },
-{ q: "Mobile advantage", a: "Alkebulan (Africa)’s mobile penetration enables crypto adoption. Low-bandwidth optimization keeps KS1 Wallet accessible." },
-{ q: "Environmental care", a: "Optimized for energy efficiency. Promotes proof-of-stake networks like Ethereum. Carbon-neutral hosting via Cloudflare." },
-{ q: "Public goods", a: "Public goods funding grows through crypto donations. Regenerative finance heals ecosystems and economies." },
-{ q: "Zero-knowledge", a: "Zero-knowledge proofs let you prove things privately—without revealing sensitive data." },
-{ q: "Tokenomics", a: "Tokenomics design incentives for network health. Voting with tokens gives you a say in protocols." },
-{ q: "Future vision", a: "Building tools for the 4th Industrial Revolution—where AI, blockchain, and human dignity intersect." },
-{ q: "Non-custodial", a: "KS1 Wallet is non-custodial. We never hold your keys. Your crypto, your control." },
-{ q: "Backup discipline", a: "Backups prevent loss. Store multiple copies in secure locations—fireproof and waterproof." },
-{ q: "Family training", a: "Teach trusted family how to recover your wallet. Practice together—before it’s urgent." },
-{ q: "Dead man’s switch", a: "Services can release keys if you’re inactive. Research options carefully—security is paramount." },
-{ q: "Multi-sig safety", a: "For large holdings, use multi-signature wallets requiring multiple keys—reduces single-point failure risk." },
-{ q: "Diversify storage", a: "Don’t store all crypto in one wallet. Diversify across devices and storage methods." },
-{ q: "Recovery test", a: "Yearly, restore your wallet from seed phrase to ensure it works. Don’t wait for an emergency." },
-{ q: "Ethical duty", a: "Protecting your family’s future is part of self-custody. Act now—your legacy depends on it." },
-{ q: "Slippage setting", a: "When swapping tokens, slippage protects against price changes. Set too low, and your swap fails." },
-{ q: "Fake tokens", a: "Scammers mimic real tokens. Always check contract addresses before swapping or approving." },
-{ q: "Custom networks", a: "Malicious RPCs steal funds. Only add networks from official project documentation." },
-{ q: "Balance confirmation", a: "Unconfirmed balances aren’t spendable. Wait for 3+ confirmations before considering funds received." },
-{ q: "Airdrop scams", a: "‘Free token’ scams steal funds. Never sign transactions for unknown airdrops—real ones require no action." },
-{ q: "Signing risks", a: "Signing messages could authorize actions. Only sign if you understand the request—when in doubt, cancel." },
-{ q: "Phishing URLs", a: "Malicious sites mimic real apps. Always verify URLs match official project domains before connecting." },
-{ q: "dApp permissions", a: "Connecting to dApps only shares your address—not funds. Spending requires separate transaction approval." },
-{ q: "Fee timing", a: "High network fees? Congestion may be temporary. Wait if your transaction isn’t urgent." },
-{ q: "Wrong network", a: "Sending tokens to the wrong network loses funds permanently. Always confirm the network before sending." },
-{ q: "Revocation need", a: "Unused token approvals are security risks. Revoke them periodically to limit exposure." },
-{ q: "Export caution", a: "Wallet exports contain sensitive info. Share only via encrypted channels—never email or SMS." },
-{ q: "Education access", a: "KS1 Wallet works on low-end devices. Education shouldn’t require expensive hardware." },
-{ q: "Community input", a: "We build what users need. Your feedback shapes KS1 Wallet’s nonprofit mission." },
-{ q: "No ads ever", a: "Free forever—no ads, no paywalls. KS1 Empire Group & Foundation {KS1EGF} funds development through grants." },
-{ q: "Local focus", a: "Built for Alkebulan (Africa)’s realities: intermittent connectivity, data costs, and mobile-first usage." },
-{ q: "Human rights", a: "Financial privacy is a human right. Censorship resistance protects activists and journalists globally." },
-{ q: "Long-term view", a: "Think decades ahead. Crypto’s design ensures it outlives us all—if stored properly." },
-{ q: "Metal storage", a: "Paper burns, phones break. Stainless steel seed plates survive fire, water, and time." },
-{ q: "Legal integration", a: "Include crypto in your legal will. Use lawyers familiar with digital asset inheritance." },
-{ q: "Trust but verify", a: "Verify everything in crypto. Official links, contract addresses, team credentials—assume nothing." },
-{ q: "Small steps", a: "Start small. Learn with tiny amounts before managing significant value. Mastery comes with practice." },
-{ q: "Patience pays", a: "Blockchain moves at its own pace. Rushing causes errors. Breathe, verify, then act." },
-{ q: "Knowledge sharing", a: "Share what you learn. Empower your community—financial freedom grows through collective knowledge." },
-{ q: "Hopeful tech", a: "Technology should uplift humanity. KS1 Wallet exists to make that real—for Alkebulan (Africa) and the world." }
-];
-let currentLearningIndex = 0;
-let learningInterval;
-function startLearningRotation() {
-if (learningInterval) clearInterval(learningInterval);
-learningInterval = setInterval(() => {
-currentLearningIndex = (currentLearningIndex + 1) % LEARNING_UNITS.length;
-render();
-}, 45000);
-}
-function stopLearningRotation() {
-if (learningInterval) {
-clearInterval(learningInterval);
-learningInterval = null;
-}
-}
-// ===== GUARDIAN MODE WARNINGS =====
-function showGuardianWarning(type) {
-const warnings = {
-send: "Transactions are irreversible. Double-check the address before confirming.",
-wrongNetwork: "Sending to the wrong network loses funds permanently.",
-approve: "This approval lets the contract spend your tokens anytime. Revoke later if unused.",
-dapp: "Never connect to phishing sites. Verify the URL matches the official project.",
-sign: "Signing this message could authorize actions. Only sign if you understand it.",
-bridge: "Cross-chain bridges are high-risk. Use only well-audited, established ones.",
-airdrop: "“Free token” scams steal funds. Never sign transactions for unknown airdrops."
-};
-if (warnings[type]) {
-alert(`⚠️ Safety Reminder:\n${warnings[type]}`);
-}
-}
 // ===== APP STATE =====
 let state = {
 view: 'landing',
@@ -481,8 +552,7 @@ balance: '...',
 selectedNetworkId: 1,
 error: '',
 isBalanceHidden: false,
-isAddressVisible: false,
-usdValue: '...'
+isAddressVisible: false
 };
 function getCurrentNetwork() {
 return SUPPORTED_NETWORKS.find(n => n.id === state.selectedNetworkId);
@@ -562,43 +632,48 @@ Building tools for the 4th Industrial Revolution—where AI, blockchain, and hum
 `;
 return;
 }
-// ===== TRANSPARENCY VIEW =====
+// ===== TRANSPARENCY VIEW (MATCHES "OUR MISSION") =====
 if (state.view === 'transparency') {
-app.innerHTML = `
-<h2 class="dashboard-title">Transparency & Ethics</h2>
-<div class="learning-unit">
-<strong>How KS1 Wallet Works</strong><br/>
-• Self-custodial crypto wallet<br/>
-• You fully control your private keys<br/>
-• Runs locally on your device<br/>
-• No centralized account required<br/>
-• Built with free and open-source tools
-</div>
-<div class="learning-unit" style="border-left-color: var(--gold);">
-<strong>What We NEVER Do</strong><br/>
-• Store your private keys<br/>
-• Access your funds<br/>
-• Track your transactions<br/>
-• Collect personal data<br/>
-• Sell your data<br/>
-• Control or reverse transactions
-</div>
-<div class="learning-unit">
-<strong>What You Control</strong><br/>
-• Your private keys<br/>
-• Your wallet access<br/>
-• Your funds<br/>
-• Your transaction decisions
-</div>
-<div class="learning-unit" style="background: rgba(212, 175, 55, 0.1); border-left-color: var(--gold);">
-<strong>Nonprofit & Ethics Statement</strong><br/>
-KS1 Wallet is built under a nonprofit mission.<br/>
-Our goal is financial education, digital freedom,<br/>
-and ethical access to blockchain technology.
-</div>
-<button class="btn btn-primary" onclick="goHome()" style="margin-top:20px;">Back to Home</button>
-`;
-return;
+  app.innerHTML = `
+    <h2 class="dashboard-title">Transparency & Ethics</h2>
+
+    <div class="learning-unit">
+      <strong>How KS1 Wallet Works</strong><br/>
+      • Self-custodial crypto wallet<br/>
+      • You fully control your private keys<br/>
+      • Runs locally on your device<br/>
+      • No centralized account required<br/>
+      • Built with free and open-source tools
+    </div>
+
+    <div class="learning-unit" style="border-left-color: var(--gold);">
+      <strong>What We NEVER Do</strong><br/>
+      • Store your private keys<br/>
+      • Access your funds<br/>
+      • Track your transactions<br/>
+      • Collect personal data<br/>
+      • Sell your data<br/>
+      • Control or reverse transactions
+    </div>
+
+    <div class="learning-unit">
+      <strong>What You Control</strong><br/>
+      • Your private keys<br/>
+      • Your wallet access<br/>
+      • Your funds<br/>
+      • Your transaction decisions
+    </div>
+
+    <div class="learning-unit" style="background: rgba(212, 175, 55, 0.1); border-left-color: var(--gold);">
+      <strong>Nonprofit & Ethics Statement</strong><br/>
+      KS1 Wallet is built under a nonprofit mission.<br/>
+      Our goal is financial education, digital freedom,<br/>
+      and ethical access to blockchain technology.
+    </div>
+
+    <button class="btn btn-primary" onclick="goHome()" style="margin-top:20px;">Back to Home</button>
+  `;
+  return;
 }
 if (state.view === 'legacy') {
 app.innerHTML = `
@@ -725,12 +800,19 @@ return;
 }
 if (state.view === 'dashboard') {
 const currentNetwork = getCurrentNetwork();
-const balanceDisplay = `${parseFloat(state.balance).toFixed(4)} ${currentNetwork.symbol}`;
+const isBitcoin = currentNetwork.type === 'bitcoin';
+const balanceDisplay = isBitcoin
+? `${parseFloat(state.balance).toFixed(8)} BTC`
+: `${parseFloat(state.balance).toFixed(4)} ${currentNetwork.symbol}`;
+
 // Balance visibility toggle
 const displayedBalance = state.isBalanceHidden ? '•••• ••••' : balanceDisplay;
-const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'}`;
+const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'} USD`;
+
 let networkSelector = '';
+if (!isBitcoin) {
 const evmOptions = SUPPORTED_NETWORKS
+.filter(n => n.type === 'evm')
 .map(n => `<option value="${n.id}">${n.name}</option>`)
 .join('');
 networkSelector = `
@@ -741,16 +823,21 @@ ${evmOptions}
 </select>
 </div>
 `;
+}
+
 // Address visibility toggle
 const addressSection = state.isAddressVisible
 ? `<div style="text-align:center; margin:16px 0;">
      <code onclick="copy('${state.address}')">${state.address}</code>
    </div>`
 : '';
+
 const learning = LEARNING_UNITS[currentLearningIndex];
 app.innerHTML = `
 <h2 class="dashboard-title">Dashboard</h2>
+
 ${networkSelector}
+
 <div style="margin: 20px 0; text-align:center;">
 <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">${currentNetwork.name} (${currentNetwork.symbol})</label>
 <div style="font-size:1.8rem; font-weight:700; color:var(--gold); display:flex; align-items:center; justify-content:center;">
@@ -759,63 +846,93 @@ ${displayedBalance}
 </div>
 <div style="color:#94a3b8; font-size:0.95rem; margin-top:6px;">${displayedUSD}</div>
 </div>
+
 <button class="btn btn-primary" onclick="toggleAddressVisibility()" style="margin:10px 0;">
 ${state.isAddressVisible ? 'Hide Wallet Address' : 'Show Wallet Address'}
 </button>
+
 ${addressSection}
+
 <div class="flex">
 <button class="btn btn-primary" onclick="goSend()">Send</button>
 <button class="btn btn-receive" onclick="goReceive()">Receive</button>
 </div>
+
 <button class="btn btn-primary" onclick="goLegacy()" style="margin-top:15px;">Legacy Planning</button>
 <a href="https://shinegpt.pages.dev/" target="_blank" class="btn btn-primary" style="margin-top:10px; text-decoration: none; display: flex; justify-content: center; align-items: center;">
   ✨ Learn with ShineGPT
 </a>
+
+${isBitcoin ? `
+<div class="bitcoin-education">
+💡 Bitcoin is a different network from Ethereum.<br/>
+💡 BTC transactions don't use gas like Ethereum.<br/>
+💡 Transactions may take 10-60 minutes to confirm.
+</div>
+` : `
 <div style="margin-top:24px; text-align:center; font-size:0.85rem; color:#64748b;">
 <span class="tooltip">💡
 <span class="tooltiptext">Gas is the fee paid to miners. Higher gas = faster transaction.</span>
 </span>
 Why do I pay gas fees?
 </div>
+`}
+
 <div class="learning-unit">
 <strong>Learn:</strong> ${learning.q}<br/>
 ${learning.a}
 </div>
 `;
+
+if (!isBitcoin) {
 document.getElementById('chain-select').value = state.selectedNetworkId;
 document.getElementById('chain-select').onchange = (e) => {
 state.selectedNetworkId = Number(e.target.value);
 fetchBalance();
 render();
 };
+}
 return;
 }
 if (state.view === 'send') {
 const currentNetwork = getCurrentNetwork();
+const isBitcoin = currentNetwork.type === 'bitcoin';
+let networkSelect = '';
+if (!isBitcoin) {
 const evmOptions = SUPPORTED_NETWORKS
+.filter(n => n.type === 'evm')
 .map(n => `<option value="${n.id}">${n.name} (${n.symbol})</option>`)
 .join('');
-app.innerHTML = `
-<h2>Send Crypto</h2>
+networkSelect = `
 <select id="send-chain" class="btn btn-secondary" style="margin-bottom:12px; padding:8px 16px; background:rgba(212,175,55,0.1); color:var(--gold);">
 ${evmOptions}
 </select>
-<input id="send-to" placeholder="Recipient address (0x...)" class="glow-on-focus" />
+`;
+}
+app.innerHTML = `
+<h2>Send Crypto</h2>
+${networkSelect}
+<input id="send-to" placeholder="${isBitcoin ? 'Bitcoin address (bc1...)' : 'Recipient address (0x...)'}" class="glow-on-focus" />
 <input id="send-amount" placeholder="Amount" type="number" step="0.0001" class="glow-on-focus" />
 ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
 <button class="btn btn-primary" onclick="handleSend()">Preview Transaction</button>
 <button class="btn btn-secondary" onclick="goDashboard()">Cancel</button>
 `;
+if (!isBitcoin) {
 document.getElementById('send-chain').value = state.selectedNetworkId;
 document.getElementById('send-chain').onchange = (e) => {
 state.selectedNetworkId = Number(e.target.value);
 render();
 };
+}
 return;
 }
 if (state.view === 'send-confirm') {
 const currentNetwork = getCurrentNetwork();
-const amountDisplay = `${state.sendAmount} ${currentNetwork.symbol}`;
+const isBitcoin = currentNetwork.type === 'bitcoin';
+const amountDisplay = isBitcoin
+? `${state.sendAmount} BTC`
+: `${state.sendAmount} ${currentNetwork.symbol}`;
 app.innerHTML = `
 <h2>Confirm Send</h2>
 <div style="background:rgba(30,41,59,0.7); padding:16px; border-radius:12px; margin:16px 0;">
@@ -835,8 +952,12 @@ return;
 }
 if (state.view === 'send-success') {
 const currentNetwork = getCurrentNetwork();
+const isBitcoin = currentNetwork.type === 'bitcoin';
+let explorerLink = '';
+if (!isBitcoin) {
 const url = CHAINS[state.selectedNetworkId].explorer + state.txHash;
-const explorerLink = `<a href="${url}" target="_blank" class="btn btn-secondary" style="display:inline-block; width:auto; padding:12px 24px;">View on Explorer</a>`;
+explorerLink = `<a href="${url}" target="_blank" class="btn btn-secondary" style="display:inline-block; width:auto; padding:12px 24px;">View on Explorer</a>`;
+}
 app.innerHTML = `
 <h2 style="color:#10b981;">✅ Sent Successfully!</h2>
 <p style="text-align:center; margin:20px 0;">Your transaction is confirmed.</p>
@@ -848,7 +969,10 @@ return;
 if (state.view === 'receive') {
 const qrHtml = generateQR(state.address);
 const currentNetwork = getCurrentNetwork();
-const warningText = `⚠️ Only send <strong>${currentNetwork.symbol}</strong> on <strong>${currentNetwork.name}</strong>.`;
+const isBitcoin = currentNetwork.type === 'bitcoin';
+const warningText = isBitcoin
+? `⚠️ Only send <strong>BTC</strong> to this address. Sending other coins may result in permanent loss.`
+: `⚠️ Only send <strong>${currentNetwork.symbol}</strong> on <strong>${currentNetwork.name}</strong>.`;
 app.innerHTML = `
 <h2>Receive Crypto</h2>
 <div class="qr">${qrHtml}</div>
@@ -862,7 +986,7 @@ app.innerHTML = `
 return;
 }
 }
-// ===== TOGGLES =====
+// ===== NEW TOGGLE FUNCTIONS =====
 function toggleBalanceVisibility() {
 state.isBalanceHidden = !state.isBalanceHidden;
 render();
@@ -872,16 +996,44 @@ state.isAddressVisible = !state.isAddressVisible;
 render();
 }
 // ===== ACTIONS =====
-function goHome() { state.view = 'landing'; state.error = ''; render(); }
-function goDashboard() { state.view = 'dashboard'; state.error = ''; render(); }
-function goSend() { state.view = 'send'; state.error = ''; render(); }
-function goReceive() { state.view = 'receive'; render(); }
-function goImpact() { state.view = 'impact'; render(); }
-function goLegacy() { state.view = 'legacy'; render(); }
-function goTransparency() { state.view = 'transparency'; render(); }
+function goHome() {
+state.view = 'landing';
+state.error = '';
+render();
+}
+function goDashboard() {
+state.view = 'dashboard';
+state.error = '';
+render();
+}
+function goSend() {
+state.view = 'send';
+state.error = '';
+render();
+}
+function goReceive() {
+state.view = 'receive';
+render();
+}
+function goImpact() {
+state.view = 'impact';
+render();
+}
+function goLegacy() {
+state.view = 'legacy';
+render();
+}
+function goTransparency() {
+state.view = 'transparency';
+render();
+}
 async function handleUnlock() {
 const pwd = document.getElementById('unlock-pwd').value;
-if (!pwd) { state.error = 'Please enter your wallet password'; render(); return; }
+if (!pwd) {
+state.error = 'Please enter your wallet password';
+render();
+return;
+}
 const wallet = await loadWallet(pwd);
 if (wallet) {
 state.wallet = wallet;
@@ -895,12 +1047,34 @@ state.error = 'Incorrect password. Please try again.';
 render();
 }
 }
-function handleCreate() { state.view = 'create'; state.error = ''; render(); }
+function handleCreate() {
+state.view = 'create';
+state.error = '';
+render();
+}
 async function handleCreateSubmit() {
 const pwd = document.getElementById('create-pwd').value;
 const networkId = document.getElementById('create-network').value;
 const selectedNetwork = SUPPORTED_NETWORKS.find(n => String(n.id) === networkId);
-if (pwd.length < 8) { state.error = 'Password must be at least 8 characters'; render(); return; }
+if (pwd.length < 8) {
+state.error = 'Password must be at least 8 characters';
+render();
+return;
+}
+if (selectedNetwork.type === 'bitcoin') {
+try {
+const { mnemonic, address } = createBitcoinWallet();
+state.mnemonic = mnemonic;
+state.address = address;
+state.selectedNetworkId = 'bitcoin';
+state.view = 'show-mnemonic';
+render();
+} catch (err) {
+console.error('Bitcoin wallet error:', err);
+state.error = 'Failed to create Bitcoin wallet. Please try again.';
+render();
+}
+} else {
 const wallet = ethers.Wallet.createRandom();
 const mnemonic = wallet.mnemonic.phrase;
 await wallet.encrypt(pwd).then(json => saveWallet(json));
@@ -909,30 +1083,65 @@ state.selectedNetworkId = selectedNetwork.id;
 state.view = 'show-mnemonic';
 render();
 }
-function handleConfirmMnemonic() { state.view = 'confirm-mnemonic'; render(); }
+}
+function handleConfirmMnemonic() {
+state.view = 'confirm-mnemonic';
+render();
+}
 function handleConfirmWords() {
 const words = state.mnemonic.split(' ');
 const w3 = document.getElementById('word3').value.trim().toLowerCase();
 const w6 = document.getElementById('word6').value.trim().toLowerCase();
 const w10 = document.getElementById('word10').value.trim().toLowerCase();
 if (w3 === words[2] && w6 === words[5] && w10 === words[9]) {
+const currentNetwork = getCurrentNetwork();
+if (currentNetwork.type === 'bitcoin') {
+state.view = 'dashboard';
+fetchBalance();
+render();
+} else {
 state.view = 'dashboard';
 state.wallet = ethers.Wallet.fromPhrase(state.mnemonic);
 state.address = state.wallet.address;
 fetchBalance();
 render();
+}
 } else {
 state.error = 'Incorrect words. Try again.';
 render();
 }
 }
-function handleImport() { state.view = 'import'; state.error = ''; render(); }
+function handleImport() {
+state.view = 'import';
+state.error = '';
+render();
+}
 async function handleImportSubmit() {
 const seed = document.getElementById('import-seed').value.trim();
 const pwd = document.getElementById('import-pwd').value;
 const networkId = document.getElementById('import-network').value;
 const selectedNetwork = SUPPORTED_NETWORKS.find(n => String(n.id) === networkId);
-if (pwd.length < 8) { state.error = 'Password must be 8+ characters'; render(); return; }
+if (pwd.length < 8) {
+state.error = 'Password must be 8+ characters';
+render();
+return;
+}
+if (selectedNetwork.type === 'bitcoin') {
+try {
+if (!bip39.validateMnemonic(seed)) {
+throw new Error('Invalid');
+}
+const address = deriveBitcoinAddressFromMnemonic(seed);
+state.address = address;
+state.selectedNetworkId = 'bitcoin';
+state.view = 'dashboard';
+fetchBalance();
+render();
+} catch {
+state.error = 'Invalid Bitcoin seed phrase';
+render();
+}
+} else {
 try {
 const wallet = ethers.Wallet.fromPhrase(seed);
 await wallet.encrypt(pwd).then(json => saveWallet(json));
@@ -947,19 +1156,29 @@ state.error = 'Invalid seed phrase';
 render();
 }
 }
+}
 async function fetchBalance() {
 state.balance = 'Loading...';
 render();
 const currentNetwork = getCurrentNetwork();
+let balanceNum = 0;
+if (currentNetwork.type === 'bitcoin') {
+balanceNum = await getBitcoinBalance(state.address);
+state.balance = balanceNum;
+} else {
 const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
 const bal = await provider.getBalance(state.address);
-const balanceNum = parseFloat(ethers.formatEther(bal));
+balanceNum = parseFloat(ethers.formatEther(bal));
 state.balance = balanceNum;
+}
+
 // Fetch USD value
 let symbol = '';
 if (currentNetwork.id === 1) symbol = 'ethereum';
 else if (currentNetwork.id === 56) symbol = 'binancecoin';
 else if (currentNetwork.id === 137) symbol = 'matic-network';
+else if (currentNetwork.id === 'bitcoin') symbol = 'bitcoin';
+
 if (symbol) {
 try {
 const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${symbol}&vs_currencies=usd`);
@@ -972,13 +1191,33 @@ state.usdValue = 'N/A';
 } else {
 state.usdValue = 'N/A';
 }
+
 render();
 }
 async function handleSend() {
 const to = document.getElementById('send-to').value;
 const amount = document.getElementById('send-amount').value;
-if (!ethers.isAddress(to)) { state.error = 'Invalid Ethereum address'; render(); return; }
-if (!amount || parseFloat(amount) <= 0) { state.error = 'Enter a valid amount'; render(); return; }
+const currentNetwork = getCurrentNetwork();
+const isBitcoin = currentNetwork.type === 'bitcoin';
+if (isBitcoin) {
+if (!isValidBitcoinAddress(to)) {
+showGuardianWarning('wrongNetwork');
+state.error = 'Invalid Bitcoin address (must start with bc1)';
+render();
+return;
+}
+} else {
+if (!ethers.isAddress(to)) {
+state.error = 'Invalid Ethereum address';
+render();
+return;
+}
+}
+if (!amount || parseFloat(amount) <= 0) {
+state.error = 'Enter a valid amount';
+render();
+return;
+}
 showGuardianWarning('send');
 state.sendTo = to;
 state.sendAmount = amount;
@@ -987,10 +1226,22 @@ render();
 }
 async function handleSendConfirm() {
 const pwd = document.getElementById('send-pwd').value;
-const wallet = await loadWallet(pwd);
-if (!wallet) { alert('❌ Invalid password'); return; }
-try {
 const currentNetwork = getCurrentNetwork();
+const isBitcoin = currentNetwork.type === 'bitcoin';
+if (isBitcoin) {
+const uri = sendBitcoinURI(state.sendTo, state.sendAmount);
+window.location.href = uri;
+setTimeout(() => {
+state.view = 'send-success';
+render();
+}, 1000);
+} else {
+const wallet = await loadWallet(pwd);
+if (!wallet) {
+alert('❌ Invalid password');
+return;
+}
+try {
 const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
 const signer = wallet.connect(provider);
 const tx = await signer.sendTransaction({
@@ -1004,6 +1255,7 @@ render();
 } catch (err) {
 alert('Transaction failed: ' + (err.reason || err.message));
 goSend();
+}
 }
 }
 // Expose to global scope

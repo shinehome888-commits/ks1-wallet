@@ -544,14 +544,6 @@ div.style.fontSize = `${18 + Math.random() * 10}px`;
 container.appendChild(div);
 }
 }
-// ===== LOAD CUSTOM NETWORKS =====
-function loadCustomNetworks() {
-const customNets = JSON.parse(localStorage.getItem('ks1_custom_networks') || '[]');
-customNets.forEach(net => {
-SUPPORTED_NETWORKS.splice(-1, 0, net); // Insert before Bitcoin
-CHAINS[net.id] = { rpc: net.rpc, explorer: net.explorer };
-});
-}
 // ===== APP STATE =====
 let state = {
 view: 'landing',
@@ -561,8 +553,7 @@ balance: '...',
 selectedNetworkId: 1,
 error: '',
 isBalanceHidden: false,
-isAddressVisible: false,
-usdValue: '...'
+isAddressVisible: false
 };
 function getCurrentNetwork() {
 return SUPPORTED_NETWORKS.find(n => n.id === state.selectedNetworkId);
@@ -803,30 +794,13 @@ ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>
 setupPasswordToggle('import-pwd', 'toggle-import');
 return;
 }
-// ===== ADD CUSTOM NETWORK VIEW =====
-if (state.view === 'add-network') {
-app.innerHTML = `
-<h2>Add Custom Network</h2>
-<p style="text-align:center; color:#94a3b8; margin-bottom:20px;">
-Add any EVM-compatible mainnet or testnet.
-</p>
-<input id="net-name" placeholder="Network Name (e.g., Sepolia)" class="glow-on-focus" />
-<input id="net-rpc" placeholder="RPC URL (e.g., https://...)" class="glow-on-focus" />
-<input id="net-chain" placeholder="Chain ID (e.g., 11155111)" type="number" class="glow-on-focus" />
-<input id="net-symbol" placeholder="Currency Symbol (e.g., ETH)" class="glow-on-focus" />
-<input id="net-explorer" placeholder="Block Explorer URL (e.g., https://...)" class="glow-on-focus" />
-${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
-<button class="btn btn-primary" onclick="handleAddNetwork()">Save Network</button>
-<button class="btn btn-secondary" onclick="goDashboard()">Cancel</button>
-`;
-return;
-}
 if (state.view === 'dashboard') {
 const currentNetwork = getCurrentNetwork();
 const isBitcoin = currentNetwork.type === 'bitcoin';
 const balanceDisplay = isBitcoin
 ? `${parseFloat(state.balance).toFixed(8)} BTC`
 : `${parseFloat(state.balance).toFixed(4)} ${currentNetwork.symbol}`;
+// Balance visibility toggle
 const displayedBalance = state.isBalanceHidden ? '•••• ••••' : balanceDisplay;
 const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'}`;
 let networkSelector = '';
@@ -842,11 +816,9 @@ networkSelector = `
 ${evmOptions}
 </select>
 </div>
-<button class="btn btn-secondary" onclick="goAddNetwork()" style="margin-top:12px;">
-➕ Add Custom Network
-</button>
 `;
 }
+// Address visibility toggle
 const addressSection = state.isAddressVisible
 ? `<div style="text-align:center; margin:16px 0;"><code onclick="copy('${state.address}')">${state.address}</code></div>`
 : '';
@@ -889,7 +861,7 @@ Why do I pay gas fees?
 </div>
 `}
 <div class="learning-unit">
-<strong>ShineGPT:</strong> ${learning.q}<br/>
+<strong>Learn:</strong> ${learning.q}<br/>
 ${learning.a}
 </div>
 `;
@@ -1012,7 +984,6 @@ function goReceive() { state.view = 'receive'; render(); }
 function goImpact() { state.view = 'impact'; render(); }
 function goLegacy() { state.view = 'legacy'; render(); }
 function goTransparency() { state.view = 'transparency'; render(); }
-function goAddNetwork() { state.view = 'add-network'; state.error = ''; render(); }
 async function handleUnlock() {
 const pwd = document.getElementById('unlock-pwd').value;
 if (!pwd) { state.error = 'Please enter your wallet password'; render(); return; }
@@ -1051,4 +1022,63 @@ render();
 } else {
 const wallet = ethers.Wallet.createRandom();
 const mnemonic = wallet.mnemonic.phrase;
-await wallet.encrypt(pwd).then
+await wallet.encrypt(pwd).then(json => saveWallet(json));
+state.mnemonic = mnemonic;
+state.selectedNetworkId = selectedNetwork.id;
+state.view = 'show-mnemonic';
+render();
+}
+}
+function handleConfirmMnemonic() { state.view = 'confirm-mnemonic'; render(); }
+function handleConfirmWords() {
+const words = state.mnemonic.split(' ');
+const w3 = document.getElementById('word3').value.trim().toLowerCase();
+const w6 = document.getElementById('word6').value.trim().toLowerCase();
+const w10 = document.getElementById('word10').value.trim().toLowerCase();
+if (w3 === words[2] && w6 === words[5] && w10 === words[9]) {
+const currentNetwork = getCurrentNetwork();
+if (currentNetwork.type === 'bitcoin') {
+state.view = 'dashboard';
+fetchBalance();
+render();
+} else {
+state.view = 'dashboard';
+state.wallet = ethers.Wallet.fromPhrase(state.mnemonic);
+state.address = state.wallet.address;
+fetchBalance();
+render();
+}
+} else {
+state.error = 'Incorrect words. Try again.';
+render();
+}
+}
+function handleImport() { state.view = 'import'; state.error = ''; render(); }
+async function handleImportSubmit() {
+const seed = document.getElementById('import-seed').value.trim();
+const pwd = document.getElementById('import-pwd').value;
+const networkId = document.getElementById('import-network').value;
+const selectedNetwork = SUPPORTED_NETWORKS.find(n => String(n.id) === networkId);
+if (pwd.length < 8) { state.error = 'Password must be 8+ characters'; render(); return; }
+if (selectedNetwork.type === 'bitcoin') {
+try {
+if (!bip39.validateMnemonic(seed)) throw new Error('Invalid');
+const address = deriveBitcoinAddressFromMnemonic(seed);
+state.address = address;
+state.selectedNetworkId = 'bitcoin';
+state.view = 'dashboard';
+fetchBalance();
+render();
+} catch {
+state.error = 'Invalid Bitcoin seed phrase';
+render();
+}
+} else {
+try {
+const wallet = ethers.Wallet.fromPhrase(seed);
+await wallet.encrypt(pwd).then(json => saveWallet(json));
+state.wallet = wallet;
+state.address = wallet.address;
+state.selectedNetworkId = selectedNetwork.id;
+state.view = 'dashboard';
+fetchBalance();

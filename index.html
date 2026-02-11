@@ -441,8 +441,7 @@ bridge: "Cross-chain bridges are high-risk. Use only well-audited, established o
 airdrop: "“Free token” scams steal funds. Never sign transactions for unknown airdrops."
 };
 if (warnings[type]) {
-alert(`⚠️ Safety Reminder:
-${warnings[type]}`);
+alert(`⚠️ Safety Reminder:\n${warnings[type]}`);
 }
 }
 // ===== NETWORK REGISTRY =====
@@ -450,12 +449,14 @@ const SUPPORTED_NETWORKS = [
 { id: 1, name: 'Ethereum', symbol: 'ETH', type: 'evm' },
 { id: 56, name: 'BNB Chain', symbol: 'BNB', type: 'evm' },
 { id: 137, name: 'Polygon', symbol: 'MATIC', type: 'evm' },
+{ id: 80001, name: 'Mumbai Testnet', symbol: 'MATIC', type: 'evm' }, // 👈 ADDED MUMBAI
 { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', type: 'bitcoin' }
 ];
 const CHAINS = {
 1: { rpc: 'https://ethereum.publicnode.com', explorer: 'https://etherscan.io/tx/' },
 56: { rpc: 'https://bsc.publicnode.com', explorer: 'https://bscscan.com/tx/' },
-137: { rpc: 'https://polygon-bor.publicnode.com', explorer: 'https://polygonscan.com/tx/' }
+137: { rpc: 'https://polygon-bor.publicnode.com', explorer: 'https://polygonscan.com/tx/' },
+80001: { rpc: 'https://rpc-mumbai.maticvigil.com', explorer: 'https://mumbai.polygonscan.com/tx/' } // 👈 ADDED MUMBAI
 };
 // ===== AUTO-LOGOUT SYSTEM =====
 let inactivityTimer;
@@ -543,6 +544,14 @@ div.style.fontSize = `${18 + Math.random() * 10}px`;
 container.appendChild(div);
 }
 }
+// ===== LOAD CUSTOM NETWORKS =====
+function loadCustomNetworks() {
+const customNets = JSON.parse(localStorage.getItem('ks1_custom_networks') || '[]');
+customNets.forEach(net => {
+SUPPORTED_NETWORKS.splice(-1, 0, net); // Insert before Bitcoin
+CHAINS[net.id] = { rpc: net.rpc, explorer: net.explorer };
+});
+}
 // ===== APP STATE =====
 let state = {
 view: 'landing',
@@ -552,7 +561,8 @@ balance: '...',
 selectedNetworkId: 1,
 error: '',
 isBalanceHidden: false,
-isAddressVisible: false
+isAddressVisible: false,
+usdValue: '...'
 };
 function getCurrentNetwork() {
 return SUPPORTED_NETWORKS.find(n => n.id === state.selectedNetworkId);
@@ -632,48 +642,43 @@ Building tools for the 4th Industrial Revolution—where AI, blockchain, and hum
 `;
 return;
 }
-// ===== TRANSPARENCY VIEW (MATCHES "OUR MISSION") =====
+// ===== TRANSPARENCY VIEW =====
 if (state.view === 'transparency') {
-  app.innerHTML = `
-    <h2 class="dashboard-title">Transparency & Ethics</h2>
-
-    <div class="learning-unit">
-      <strong>How KS1 Wallet Works</strong><br/>
-      • Self-custodial crypto wallet<br/>
-      • You fully control your private keys<br/>
-      • Runs locally on your device<br/>
-      • No centralized account required<br/>
-      • Built with free and open-source tools
-    </div>
-
-    <div class="learning-unit" style="border-left-color: var(--gold);">
-      <strong>What We NEVER Do</strong><br/>
-      • Store your private keys<br/>
-      • Access your funds<br/>
-      • Track your transactions<br/>
-      • Collect personal data<br/>
-      • Sell your data<br/>
-      • Control or reverse transactions
-    </div>
-
-    <div class="learning-unit">
-      <strong>What You Control</strong><br/>
-      • Your private keys<br/>
-      • Your wallet access<br/>
-      • Your funds<br/>
-      • Your transaction decisions
-    </div>
-
-    <div class="learning-unit" style="background: rgba(212, 175, 55, 0.1); border-left-color: var(--gold);">
-      <strong>Nonprofit & Ethics Statement</strong><br/>
-      KS1 Wallet is built under a nonprofit mission.<br/>
-      Our goal is financial education, digital freedom,<br/>
-      and ethical access to blockchain technology.
-    </div>
-
-    <button class="btn btn-primary" onclick="goHome()" style="margin-top:20px;">Back to Home</button>
-  `;
-  return;
+app.innerHTML = `
+<h2 class="dashboard-title">Transparency & Ethics</h2>
+<div class="learning-unit">
+<strong>How KS1 Wallet Works</strong><br/>
+• Self-custodial crypto wallet<br/>
+• You fully control your private keys<br/>
+• Runs locally on your device<br/>
+• No centralized account required<br/>
+• Built with free and open-source tools
+</div>
+<div class="learning-unit" style="border-left-color: var(--gold);">
+<strong>What We NEVER Do</strong><br/>
+• Store your private keys<br/>
+• Access your funds<br/>
+• Track your transactions<br/>
+• Collect personal data<br/>
+• Sell your data<br/>
+• Control or reverse transactions
+</div>
+<div class="learning-unit">
+<strong>What You Control</strong><br/>
+• Your private keys<br/>
+• Your wallet access<br/>
+• Your funds<br/>
+• Your transaction decisions
+</div>
+<div class="learning-unit" style="background: rgba(212, 175, 55, 0.1); border-left-color: var(--gold);">
+<strong>Nonprofit & Ethics Statement</strong><br/>
+KS1 Wallet is built under a nonprofit mission.<br/>
+Our goal is financial education, digital freedom,<br/>
+and ethical access to blockchain technology.
+</div>
+<button class="btn btn-primary" onclick="goHome()" style="margin-top:20px;">Back to Home</button>
+`;
+return;
 }
 if (state.view === 'legacy') {
 app.innerHTML = `
@@ -798,17 +803,32 @@ ${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>
 setupPasswordToggle('import-pwd', 'toggle-import');
 return;
 }
+// ===== ADD CUSTOM NETWORK VIEW =====
+if (state.view === 'add-network') {
+app.innerHTML = `
+<h2>Add Custom Network</h2>
+<p style="text-align:center; color:#94a3b8; margin-bottom:20px;">
+Add any EVM-compatible mainnet or testnet.
+</p>
+<input id="net-name" placeholder="Network Name (e.g., Sepolia)" class="glow-on-focus" />
+<input id="net-rpc" placeholder="RPC URL (e.g., https://...)" class="glow-on-focus" />
+<input id="net-chain" placeholder="Chain ID (e.g., 11155111)" type="number" class="glow-on-focus" />
+<input id="net-symbol" placeholder="Currency Symbol (e.g., ETH)" class="glow-on-focus" />
+<input id="net-explorer" placeholder="Block Explorer URL (e.g., https://...)" class="glow-on-focus" />
+${state.error ? `<p style="color:#f87171; text-align:center;">${state.error}</p>` : ''}
+<button class="btn btn-primary" onclick="handleAddNetwork()">Save Network</button>
+<button class="btn btn-secondary" onclick="goDashboard()">Cancel</button>
+`;
+return;
+}
 if (state.view === 'dashboard') {
 const currentNetwork = getCurrentNetwork();
 const isBitcoin = currentNetwork.type === 'bitcoin';
 const balanceDisplay = isBitcoin
 ? `${parseFloat(state.balance).toFixed(8)} BTC`
 : `${parseFloat(state.balance).toFixed(4)} ${currentNetwork.symbol}`;
-
-// Balance visibility toggle
 const displayedBalance = state.isBalanceHidden ? '•••• ••••' : balanceDisplay;
-const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'} USD`;
-
+const displayedUSD = state.isBalanceHidden ? '≈ $•••• USD' : `≈ $${state.usdValue || '...'}`;
 let networkSelector = '';
 if (!isBitcoin) {
 const evmOptions = SUPPORTED_NETWORKS
@@ -822,22 +842,18 @@ networkSelector = `
 ${evmOptions}
 </select>
 </div>
+<button class="btn btn-secondary" onclick="goAddNetwork()" style="margin-top:12px;">
+➕ Add Custom Network
+</button>
 `;
 }
-
-// Address visibility toggle
 const addressSection = state.isAddressVisible
-? `<div style="text-align:center; margin:16px 0;">
-     <code onclick="copy('${state.address}')">${state.address}</code>
-   </div>`
+? `<div style="text-align:center; margin:16px 0;"><code onclick="copy('${state.address}')">${state.address}</code></div>`
 : '';
-
 const learning = LEARNING_UNITS[currentLearningIndex];
 app.innerHTML = `
 <h2 class="dashboard-title">Dashboard</h2>
-
 ${networkSelector}
-
 <div style="margin: 20px 0; text-align:center;">
 <label style="display:block; color:var(--gold); font-weight:600; margin-bottom:8px;">${currentNetwork.name} (${currentNetwork.symbol})</label>
 <div style="font-size:1.8rem; font-weight:700; color:var(--gold); display:flex; align-items:center; justify-content:center;">
@@ -846,23 +862,18 @@ ${displayedBalance}
 </div>
 <div style="color:#94a3b8; font-size:0.95rem; margin-top:6px;">${displayedUSD}</div>
 </div>
-
 <button class="btn btn-primary" onclick="toggleAddressVisibility()" style="margin:10px 0;">
 ${state.isAddressVisible ? 'Hide Wallet Address' : 'Show Wallet Address'}
 </button>
-
 ${addressSection}
-
 <div class="flex">
 <button class="btn btn-primary" onclick="goSend()">Send</button>
 <button class="btn btn-receive" onclick="goReceive()">Receive</button>
 </div>
-
 <button class="btn btn-primary" onclick="goLegacy()" style="margin-top:15px;">Legacy Planning</button>
 <a href="https://shinegpt.pages.dev/" target="_blank" class="btn btn-primary" style="margin-top:10px; text-decoration: none; display: flex; justify-content: center; align-items: center;">
-  ✨ Learn with ShineGPT
+✨ Learn with ShineGPT
 </a>
-
 ${isBitcoin ? `
 <div class="bitcoin-education">
 💡 Bitcoin is a different network from Ethereum.<br/>
@@ -877,13 +888,11 @@ ${isBitcoin ? `
 Why do I pay gas fees?
 </div>
 `}
-
 <div class="learning-unit">
-<strong>Learn:</strong> ${learning.q}<br/>
+<strong>ShineGPT:</strong> ${learning.q}<br/>
 ${learning.a}
 </div>
 `;
-
 if (!isBitcoin) {
 document.getElementById('chain-select').value = state.selectedNetworkId;
 document.getElementById('chain-select').onchange = (e) => {
@@ -986,7 +995,7 @@ app.innerHTML = `
 return;
 }
 }
-// ===== NEW TOGGLE FUNCTIONS =====
+// ===== TOGGLES =====
 function toggleBalanceVisibility() {
 state.isBalanceHidden = !state.isBalanceHidden;
 render();
@@ -996,44 +1005,17 @@ state.isAddressVisible = !state.isAddressVisible;
 render();
 }
 // ===== ACTIONS =====
-function goHome() {
-state.view = 'landing';
-state.error = '';
-render();
-}
-function goDashboard() {
-state.view = 'dashboard';
-state.error = '';
-render();
-}
-function goSend() {
-state.view = 'send';
-state.error = '';
-render();
-}
-function goReceive() {
-state.view = 'receive';
-render();
-}
-function goImpact() {
-state.view = 'impact';
-render();
-}
-function goLegacy() {
-state.view = 'legacy';
-render();
-}
-function goTransparency() {
-state.view = 'transparency';
-render();
-}
+function goHome() { state.view = 'landing'; state.error = ''; render(); }
+function goDashboard() { state.view = 'dashboard'; state.error = ''; render(); }
+function goSend() { state.view = 'send'; state.error = ''; render(); }
+function goReceive() { state.view = 'receive'; render(); }
+function goImpact() { state.view = 'impact'; render(); }
+function goLegacy() { state.view = 'legacy'; render(); }
+function goTransparency() { state.view = 'transparency'; render(); }
+function goAddNetwork() { state.view = 'add-network'; state.error = ''; render(); }
 async function handleUnlock() {
 const pwd = document.getElementById('unlock-pwd').value;
-if (!pwd) {
-state.error = 'Please enter your wallet password';
-render();
-return;
-}
+if (!pwd) { state.error = 'Please enter your wallet password'; render(); return; }
 const wallet = await loadWallet(pwd);
 if (wallet) {
 state.wallet = wallet;
@@ -1047,20 +1029,12 @@ state.error = 'Incorrect password. Please try again.';
 render();
 }
 }
-function handleCreate() {
-state.view = 'create';
-state.error = '';
-render();
-}
+function handleCreate() { state.view = 'create'; state.error = ''; render(); }
 async function handleCreateSubmit() {
 const pwd = document.getElementById('create-pwd').value;
 const networkId = document.getElementById('create-network').value;
 const selectedNetwork = SUPPORTED_NETWORKS.find(n => String(n.id) === networkId);
-if (pwd.length < 8) {
-state.error = 'Password must be at least 8 characters';
-render();
-return;
-}
+if (pwd.length < 8) { state.error = 'Password must be at least 8 characters'; render(); return; }
 if (selectedNetwork.type === 'bitcoin') {
 try {
 const { mnemonic, address } = createBitcoinWallet();
@@ -1077,210 +1051,4 @@ render();
 } else {
 const wallet = ethers.Wallet.createRandom();
 const mnemonic = wallet.mnemonic.phrase;
-await wallet.encrypt(pwd).then(json => saveWallet(json));
-state.mnemonic = mnemonic;
-state.selectedNetworkId = selectedNetwork.id;
-state.view = 'show-mnemonic';
-render();
-}
-}
-function handleConfirmMnemonic() {
-state.view = 'confirm-mnemonic';
-render();
-}
-function handleConfirmWords() {
-const words = state.mnemonic.split(' ');
-const w3 = document.getElementById('word3').value.trim().toLowerCase();
-const w6 = document.getElementById('word6').value.trim().toLowerCase();
-const w10 = document.getElementById('word10').value.trim().toLowerCase();
-if (w3 === words[2] && w6 === words[5] && w10 === words[9]) {
-const currentNetwork = getCurrentNetwork();
-if (currentNetwork.type === 'bitcoin') {
-state.view = 'dashboard';
-fetchBalance();
-render();
-} else {
-state.view = 'dashboard';
-state.wallet = ethers.Wallet.fromPhrase(state.mnemonic);
-state.address = state.wallet.address;
-fetchBalance();
-render();
-}
-} else {
-state.error = 'Incorrect words. Try again.';
-render();
-}
-}
-function handleImport() {
-state.view = 'import';
-state.error = '';
-render();
-}
-async function handleImportSubmit() {
-const seed = document.getElementById('import-seed').value.trim();
-const pwd = document.getElementById('import-pwd').value;
-const networkId = document.getElementById('import-network').value;
-const selectedNetwork = SUPPORTED_NETWORKS.find(n => String(n.id) === networkId);
-if (pwd.length < 8) {
-state.error = 'Password must be 8+ characters';
-render();
-return;
-}
-if (selectedNetwork.type === 'bitcoin') {
-try {
-if (!bip39.validateMnemonic(seed)) {
-throw new Error('Invalid');
-}
-const address = deriveBitcoinAddressFromMnemonic(seed);
-state.address = address;
-state.selectedNetworkId = 'bitcoin';
-state.view = 'dashboard';
-fetchBalance();
-render();
-} catch {
-state.error = 'Invalid Bitcoin seed phrase';
-render();
-}
-} else {
-try {
-const wallet = ethers.Wallet.fromPhrase(seed);
-await wallet.encrypt(pwd).then(json => saveWallet(json));
-state.wallet = wallet;
-state.address = wallet.address;
-state.selectedNetworkId = selectedNetwork.id;
-state.view = 'dashboard';
-fetchBalance();
-render();
-} catch {
-state.error = 'Invalid seed phrase';
-render();
-}
-}
-}
-async function fetchBalance() {
-state.balance = 'Loading...';
-render();
-const currentNetwork = getCurrentNetwork();
-let balanceNum = 0;
-if (currentNetwork.type === 'bitcoin') {
-balanceNum = await getBitcoinBalance(state.address);
-state.balance = balanceNum;
-} else {
-const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
-const bal = await provider.getBalance(state.address);
-balanceNum = parseFloat(ethers.formatEther(bal));
-state.balance = balanceNum;
-}
-
-// Fetch USD value
-let symbol = '';
-if (currentNetwork.id === 1) symbol = 'ethereum';
-else if (currentNetwork.id === 56) symbol = 'binancecoin';
-else if (currentNetwork.id === 137) symbol = 'matic-network';
-else if (currentNetwork.id === 'bitcoin') symbol = 'bitcoin';
-
-if (symbol) {
-try {
-const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${symbol}&vs_currencies=usd`);
-const data = await res.json();
-const usdPrice = data[symbol]?.usd || 0;
-state.usdValue = (balanceNum * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-} catch (e) {
-state.usdValue = 'N/A';
-}
-} else {
-state.usdValue = 'N/A';
-}
-
-render();
-}
-async function handleSend() {
-const to = document.getElementById('send-to').value;
-const amount = document.getElementById('send-amount').value;
-const currentNetwork = getCurrentNetwork();
-const isBitcoin = currentNetwork.type === 'bitcoin';
-if (isBitcoin) {
-if (!isValidBitcoinAddress(to)) {
-showGuardianWarning('wrongNetwork');
-state.error = 'Invalid Bitcoin address (must start with bc1)';
-render();
-return;
-}
-} else {
-if (!ethers.isAddress(to)) {
-state.error = 'Invalid Ethereum address';
-render();
-return;
-}
-}
-if (!amount || parseFloat(amount) <= 0) {
-state.error = 'Enter a valid amount';
-render();
-return;
-}
-showGuardianWarning('send');
-state.sendTo = to;
-state.sendAmount = amount;
-state.view = 'send-confirm';
-render();
-}
-async function handleSendConfirm() {
-const pwd = document.getElementById('send-pwd').value;
-const currentNetwork = getCurrentNetwork();
-const isBitcoin = currentNetwork.type === 'bitcoin';
-if (isBitcoin) {
-const uri = sendBitcoinURI(state.sendTo, state.sendAmount);
-window.location.href = uri;
-setTimeout(() => {
-state.view = 'send-success';
-render();
-}, 1000);
-} else {
-const wallet = await loadWallet(pwd);
-if (!wallet) {
-alert('❌ Invalid password');
-return;
-}
-try {
-const provider = new ethers.JsonRpcProvider(CHAINS[currentNetwork.id].rpc);
-const signer = wallet.connect(provider);
-const tx = await signer.sendTransaction({
-to: state.sendTo,
-value: ethers.parseEther(state.sendAmount)
-});
-await tx.wait();
-state.txHash = tx.hash;
-state.view = 'send-success';
-render();
-} catch (err) {
-alert('Transaction failed: ' + (err.reason || err.message));
-goSend();
-}
-}
-}
-// Expose to global scope
-window.handleCreate = handleCreate;
-window.handleImport = handleImport;
-window.goHome = goHome;
-window.goDashboard = goDashboard;
-window.goSend = goSend;
-window.goReceive = goReceive;
-window.goImpact = goImpact;
-window.goLegacy = goLegacy;
-window.goTransparency = goTransparency;
-window.handleCreateSubmit = handleCreateSubmit;
-window.handleConfirmMnemonic = handleConfirmMnemonic;
-window.handleConfirmWords = handleConfirmWords;
-window.handleImportSubmit = handleImportSubmit;
-window.handleSend = handleSend;
-window.handleSendConfirm = handleSendConfirm;
-window.copy = copy;
-window.handleUnlock = handleUnlock;
-window.toggleBalanceVisibility = toggleBalanceVisibility;
-window.toggleAddressVisibility = toggleAddressVisibility;
-// Initialize
-createWatermarks();
-render();
-</script>
-</body>
-</html>
+await wallet.encrypt(pwd).then
